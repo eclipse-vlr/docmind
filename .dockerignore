@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+bin
+coverage.out
+data
+*.exe
+*.test
+DOCMIND_CODEX.md
+AGENTS.md
+.codex
+.agents
+docs/stage-*.md

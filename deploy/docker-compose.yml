@@ -1,0 +1,76 @@
+name: docmind
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg17
+    environment:
+      POSTGRES_USER: docmind
+      POSTGRES_DB: docmind
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docmind_dev}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/001-vector.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docmind -d docmind"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 5s
+
+  migrate:
+    image: docmind:local
+    build:
+      context: ..
+      target: runtime
+    entrypoint: ["/docmind-migrate"]
+    environment:
+      DATABASE_URL: postgres://docmind:${POSTGRES_PASSWORD:-docmind_dev}@postgres:5432/docmind?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  integration:
+    profiles: [tools]
+    build:
+      context: ..
+      target: test
+    environment:
+      TEST_DATABASE_URL: postgres://docmind:${POSTGRES_PASSWORD:-docmind_dev}@postgres:5432/docmind?sslmode=disable
+    command: ["go", "test", "-race", "-count=1", "-timeout=60s", "-v", "./tests/integration"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    image: docmind:local
+    build:
+      context: ..
+      target: runtime
+    env_file:
+      - ../.env
+    environment:
+      HTTP_ADDR: ":8080"
+      STORAGE_DIR: /data/documents
+      DATABASE_URL: postgres://docmind:${POSTGRES_PASSWORD:-docmind_dev}@postgres:5432/docmind?sslmode=disable
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - document_files:/data/documents
+    stop_grace_period: 40s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  postgres_data:
+  document_files:

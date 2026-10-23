@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+/bin/
+/coverage.out
+/data/
+*.test
+*.exe
+
+# Local development instructions and stage reports
+/DOCMIND_CODEX.md
+/AGENTS.md
+/.codex/
+/.agents/
+/docs/stage-*.md
