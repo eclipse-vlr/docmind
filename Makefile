@@ -1,4 +1,4 @@
-.PHONY: fmt vet test test-docker test-integration build run migrate up down logs
+.PHONY: fmt vet test test-docker test-integration build run worker migrate up down logs
 
 fmt:
 	go fmt ./...
@@ -17,9 +17,13 @@ test-integration:
 
 build:
 	go build -o bin/docmind-api ./cmd/api
+	go build -o bin/docmind-worker ./cmd/worker
 
 run:
 	go run ./cmd/api
+
+worker:
+	go run ./cmd/worker
 
 migrate:
 	go run ./cmd/migrate
