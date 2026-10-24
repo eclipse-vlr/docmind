@@ -27,11 +27,14 @@ type Job struct {
 	StorageKey string
 	MIMEType   string
 	Attempt    int
+	Generation int64
+	Model      string
 }
 
 type Chunk struct {
-	Text string
-	Page *int
+	Text      string
+	Page      *int
+	Embedding []float32
 }
 
 // Repository owns atomic claims and fenced finalization, including document status.

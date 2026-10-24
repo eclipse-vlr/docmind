@@ -11,6 +11,7 @@ import (
 
 	"docmind/internal/documents"
 	"docmind/internal/ingestion"
+	"docmind/internal/llm"
 )
 
 func queuedDocument(t *testing.T, f *fixture, text string) documents.Document {
@@ -40,7 +41,7 @@ func expire(t *testing.T, f *fixture, job ingestion.Job) {
 
 func worker(t *testing.T, f *fixture, parser ingestion.Parser) *ingestion.Worker {
 	t.Helper()
-	w, err := ingestion.NewWorker(f.repo, f.files, parser, ingestion.Settings{
+	w, err := ingestion.NewWorker(f.repo, f.files, parser, llm.Fake{}, ingestion.Settings{
 		PollInterval: time.Second, JobTimeout: 30 * time.Second, LeaseDuration: time.Minute, DBTimeout: 3 * time.Second, MaxAttempts: 3,
 	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
@@ -118,7 +119,7 @@ func TestLeaseRecoveryAndFencing(t *testing.T) {
 	d := queuedDocument(t, f, "text")
 	old := claim(t, f)
 	expire(t, f, old)
-	if err := f.repo.CompleteJob(ctx, old, []ingestion.Chunk{{Text: "stale"}}); !errors.Is(err, ingestion.ErrLeaseLost) {
+	if err := completeChunks(f, ctx, old, []ingestion.Chunk{{Text: "stale"}}); !errors.Is(err, ingestion.ErrLeaseLost) {
 		t.Fatal("expired owner committed", err)
 	}
 	current := claim(t, f)
@@ -128,10 +129,10 @@ func TestLeaseRecoveryAndFencing(t *testing.T) {
 	if err := f.repo.FailJob(ctx, old, "stale error", true, 3); !errors.Is(err, ingestion.ErrLeaseLost) {
 		t.Fatal("stale failure changed document", err)
 	}
-	if err := f.repo.CompleteJob(ctx, current, []ingestion.Chunk{{Text: "current"}}); err != nil {
+	if err := completeChunks(f, ctx, current, []ingestion.Chunk{{Text: "current"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.repo.CompleteJob(ctx, current, []ingestion.Chunk{{Text: "duplicate"}}); !errors.Is(err, ingestion.ErrLeaseLost) {
+	if err := completeChunks(f, ctx, current, []ingestion.Chunk{{Text: "duplicate"}}); !errors.Is(err, ingestion.ErrLeaseLost) {
 		t.Fatal("duplicate completion accepted", err)
 	}
 	var text string
@@ -181,7 +182,7 @@ func TestFinalizationRollback(t *testing.T) {
 	ctx := context.Background()
 	d := queuedDocument(t, f, "text")
 	j := claim(t, f)
-	if err := f.repo.CompleteJob(ctx, j, []ingestion.Chunk{{Text: "valid"}, {Text: ""}}); err == nil {
+	if err := completeChunks(f, ctx, j, []ingestion.Chunk{{Text: "valid"}, {Text: ""}}); err == nil {
 		t.Fatal("expected invalid chunk rejection")
 	}
 	var n int
@@ -192,7 +193,7 @@ func TestFinalizationRollback(t *testing.T) {
 	if err != nil || stored.Status != "processing" {
 		t.Fatal("failed finalization published ready", stored, err)
 	}
-	if err := f.repo.CompleteJob(ctx, j, []ingestion.Chunk{{Text: "valid"}}); err != nil {
+	if err := completeChunks(f, ctx, j, []ingestion.Chunk{{Text: "valid"}}); err != nil {
 		t.Fatal("retry after rollback failed", err)
 	}
 }
@@ -205,7 +206,7 @@ func TestDeletionDuringIngestion(t *testing.T) {
 	start := make(chan struct{})
 	completed := make(chan error, 1)
 	deleted := make(chan error, 1)
-	go func() { <-start; completed <- f.repo.CompleteJob(ctx, j, []ingestion.Chunk{{Text: "text"}}) }()
+	go func() { <-start; completed <- completeChunks(f, ctx, j, []ingestion.Chunk{{Text: "text"}}) }()
 	go func() { <-start; deleted <- f.service.Delete(ctx, d.ID) }()
 	close(start)
 	cErr, dErr := <-completed, <-deleted
@@ -215,7 +216,7 @@ func TestDeletionDuringIngestion(t *testing.T) {
 	if dErr != nil {
 		t.Fatal(dErr)
 	}
-	if err := f.repo.CompleteJob(ctx, j, []ingestion.Chunk{{Text: "resurrect"}}); !errors.Is(err, ingestion.ErrLeaseLost) {
+	if err := completeChunks(f, ctx, j, []ingestion.Chunk{{Text: "resurrect"}}); !errors.Is(err, ingestion.ErrLeaseLost) {
 		t.Fatal("deleted document resurrected", err)
 	}
 	var n int
@@ -277,4 +278,20 @@ func TestWorkerPermanentFailure(t *testing.T) {
 	if err != nil || stored.Status != "failed" || stored.ErrorMessage == "" {
 		t.Fatal("empty document was not failed", stored, err)
 	}
+}
+
+func completeChunks(f *fixture, ctx context.Context, job ingestion.Job, chunks []ingestion.Chunk) error {
+	job.Model = (llm.Fake{}).Model()
+	for i := range chunks {
+		text := chunks[i].Text
+		if text == "" {
+			text = "invalid chunk"
+		}
+		vectors, err := (llm.Fake{}).Embed(ctx, []string{text})
+		if err != nil {
+			return err
+		}
+		chunks[i].Embedding = vectors[0]
+	}
+	return f.repo.CompleteJob(ctx, job, chunks)
 }

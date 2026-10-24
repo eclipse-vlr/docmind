@@ -7,6 +7,7 @@ import (
 
 	"docmind/internal/documents"
 	"docmind/internal/ingestion"
+	"docmind/internal/llm"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -58,11 +59,11 @@ func (s *Store) ClaimJob(ctx context.Context, lease time.Duration, maxAttempts i
 	}
 	err = tx.QueryRow(ctx, `UPDATE ingestion_jobs SET status='processing', attempts=attempts+1,
 		lease_until=clock_timestamp()+$2*interval '1 microsecond', error_message='', updated_at=clock_timestamp()
-		WHERE id=$1 RETURNING attempts`, job.ID, lease.Microseconds()).Scan(&job.Attempt)
+		WHERE id=$1 RETURNING attempts,generation`, job.ID, lease.Microseconds()).Scan(&job.Attempt, &job.Generation)
 	if err != nil {
 		return job, err
 	}
-	if _, err := tx.Exec(ctx, "UPDATE documents SET status='processing', error_message='', updated_at=clock_timestamp() WHERE id=$1", job.DocumentID); err != nil {
+	if _, err := tx.Exec(ctx, "UPDATE documents SET status='processing', embedding_model='', error_message='', updated_at=clock_timestamp() WHERE id=$1", job.DocumentID); err != nil {
 		return job, err
 	}
 	if err := commit(ctx, tx); err != nil {
@@ -81,7 +82,7 @@ func (s *Store) lockJob(ctx context.Context, tx pgx.Tx, job ingestion.Job) error
 		return err
 	}
 	err = tx.QueryRow(ctx, `SELECT id::text FROM ingestion_jobs WHERE id=$1 AND document_id=$2
-		AND status='processing' AND attempts=$3 AND lease_until>clock_timestamp() FOR UPDATE`, job.ID, job.DocumentID, job.Attempt).Scan(&id)
+		AND status='processing' AND attempts=$3 AND generation=$4 AND lease_until>clock_timestamp() FOR UPDATE`, job.ID, job.DocumentID, job.Attempt, job.Generation).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ingestion.ErrLeaseLost
 	}
@@ -91,6 +92,14 @@ func (s *Store) lockJob(ctx context.Context, tx pgx.Tx, job ingestion.Job) error
 func (s *Store) CompleteJob(ctx context.Context, job ingestion.Job, chunks []ingestion.Chunk) error {
 	if len(chunks) == 0 || len(chunks) > ingestion.MaxChunks {
 		return ingestion.ErrLimit
+	}
+	if job.Model == "" || len(job.Model) > 128 {
+		return llm.ErrResponse
+	}
+	for _, chunk := range chunks {
+		if err := llm.ValidateVector(chunk.Embedding); err != nil {
+			return err
+		}
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -103,11 +112,19 @@ func (s *Store) CompleteJob(ctx context.Context, job ingestion.Job, chunks []ing
 	if _, err := tx.Exec(ctx, "DELETE FROM document_chunks WHERE document_id=$1", job.DocumentID); err != nil {
 		return err
 	}
-	rows := make([][]any, len(chunks))
+	batch := &pgx.Batch{}
 	for i, chunk := range chunks {
-		rows[i] = []any{documents.NewID(), job.DocumentID, i, chunk.Page, chunk.Text}
+		batch.Queue(`INSERT INTO document_chunks(id,document_id,ordinal,page_number,content,embedding)
+			VALUES ($1,$2,$3,$4,$5,$6::text::public.vector)`, documents.NewID(), job.DocumentID, i, chunk.Page, chunk.Text, vectorString(chunk.Embedding))
 	}
-	if _, err := tx.CopyFrom(ctx, pgx.Identifier{"document_chunks"}, []string{"id", "document_id", "ordinal", "page_number", "content"}, pgx.CopyFromRows(rows)); err != nil {
+	results := tx.SendBatch(ctx, batch)
+	for range chunks {
+		if _, err := results.Exec(); err != nil {
+			_ = results.Close()
+			return err
+		}
+	}
+	if err := results.Close(); err != nil {
 		return err
 	}
 	result, err := tx.Exec(ctx, `UPDATE ingestion_jobs SET status='completed', lease_until=NULL, error_message='', updated_at=clock_timestamp()
@@ -118,7 +135,7 @@ func (s *Store) CompleteJob(ctx context.Context, job ingestion.Job, chunks []ing
 	if result.RowsAffected() != 1 {
 		return ingestion.ErrLeaseLost
 	}
-	if _, err := tx.Exec(ctx, "UPDATE documents SET status='ready', error_message='', updated_at=clock_timestamp() WHERE id=$1", job.DocumentID); err != nil {
+	if _, err := tx.Exec(ctx, "UPDATE documents SET status='ready', embedding_model=$2, error_message='', updated_at=clock_timestamp() WHERE id=$1", job.DocumentID, job.Model); err != nil {
 		return err
 	}
 	return commit(ctx, tx)

@@ -27,6 +27,10 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("load worker configuration: %w", err)
 	}
+	embeddings, err := config.Embeddings(os.Getenv)
+	if err != nil {
+		return err
+	}
 	parser := ingestion.TextParser{}
 	if err := parser.Check(); err != nil {
 		return err
@@ -50,11 +54,11 @@ func run() error {
 		return errors.New("open private file storage failed")
 	}
 	defer files.Close()
-	w, err := ingestion.NewWorker(db, files, parser, settings, logger)
+	w, err := ingestion.NewWorker(db, files, parser, embeddings, settings, logger)
 	if err != nil {
 		return err
 	}
-	logger.Info("worker_started", "max_attempts", settings.MaxAttempts)
+	logger.Info("worker_started", "max_attempts", settings.MaxAttempts, "embedding_model", embeddings.Model())
 	err = w.Run(ctx)
 	if errors.Is(err, context.Canceled) {
 		logger.Info("worker_stopped")

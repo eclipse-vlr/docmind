@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"docmind/internal/documents"
+	"docmind/internal/llm"
 )
 
 type Settings struct {
@@ -20,18 +21,22 @@ type Settings struct {
 // Worker processes one job at a time. Run owns its loop; cancellation stops
 // parsing and leaves unacknowledged work recoverable after the persisted lease.
 type Worker struct {
-	repo     Repository
-	files    Files
-	parser   Parser
-	settings Settings
-	logger   *slog.Logger
+	repo       Repository
+	files      Files
+	parser     Parser
+	embeddings llm.EmbeddingProvider
+	settings   Settings
+	logger     *slog.Logger
 }
 
-func NewWorker(repo Repository, files Files, parser Parser, settings Settings, logger *slog.Logger) (*Worker, error) {
+func NewWorker(repo Repository, files Files, parser Parser, embeddings llm.EmbeddingProvider, settings Settings, logger *slog.Logger) (*Worker, error) {
 	if settings.PollInterval <= 0 || settings.PollInterval > time.Hour || settings.JobTimeout <= 0 || settings.JobTimeout > time.Hour || settings.DBTimeout <= 0 || settings.DBTimeout > time.Hour || settings.LeaseDuration > time.Hour || settings.LeaseDuration <= settings.JobTimeout+2*settings.DBTimeout || settings.MaxAttempts < 1 || settings.MaxAttempts > 10 {
 		return nil, errors.New("invalid worker settings")
 	}
-	return &Worker{repo: repo, files: files, parser: parser, settings: settings, logger: logger}, nil
+	if embeddings == nil || embeddings.Model() == "" {
+		return nil, errors.New("embedding provider is required")
+	}
+	return &Worker{repo: repo, files: files, parser: parser, embeddings: embeddings, settings: settings, logger: logger}, nil
 }
 
 func (w *Worker) Run(ctx context.Context) error {
@@ -70,6 +75,10 @@ func (w *Worker) Step(ctx context.Context) error {
 	if err == nil {
 		chunks, err = w.parser.Parse(jobCtx, job.MIMEType, data)
 	}
+	if err == nil {
+		err = w.embed(jobCtx, chunks)
+	}
+	job.Model = w.embeddings.Model()
 	cancelJob()
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -92,10 +101,36 @@ func (w *Worker) Step(ctx context.Context) error {
 		message, permanent = "Документ превышает ограничения извлечения текста.", true
 	case errors.Is(err, ErrInvalid):
 		message, permanent = "Не удалось прочитать текст документа.", true
+	case errors.Is(err, llm.ErrRejected), errors.Is(err, llm.ErrInput):
+		message, permanent = "Провайдер embeddings отклонил запрос; проверьте настройки.", true
 	}
 	if err := w.repo.FailJob(finishCtx, job, message, permanent, w.settings.MaxAttempts); err != nil {
 		return err
 	}
 	w.logger.Warn("ingestion_attempt_failed", "document_id", job.DocumentID, "attempt", job.Attempt, "permanent", permanent)
 	return nil
+}
+
+func (w *Worker) embed(ctx context.Context, chunks []Chunk) error {
+	for start := 0; start < len(chunks); start += llm.BatchSize {
+		end := min(start+llm.BatchSize, len(chunks))
+		texts := make([]string, end-start)
+		for i := range texts {
+			texts[i] = chunks[start+i].Text
+		}
+		vectors, err := w.embeddings.Embed(ctx, texts)
+		if err != nil {
+			return err
+		}
+		if len(vectors) != len(texts) {
+			return llm.ErrResponse
+		}
+		for i, vector := range vectors {
+			if err := llm.ValidateVector(vector); err != nil {
+				return err
+			}
+			chunks[start+i].Embedding = vector
+		}
+	}
+	return ctx.Err()
 }
