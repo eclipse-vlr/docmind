@@ -34,6 +34,10 @@ type fixture struct {
 }
 
 func setup(t *testing.T) *fixture {
+	return setupSchema(t, true)
+}
+
+func setupSchema(t *testing.T, migrate bool) *fixture {
 	t.Helper()
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
@@ -70,11 +74,13 @@ func setup(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(repo.Close)
-	if err := repo.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := repo.Migrate(ctx); err != nil {
-		t.Fatal("migration was not repeatable", err)
+	if migrate {
+		if err := repo.Migrate(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.Migrate(ctx); err != nil {
+			t.Fatal("migration was not repeatable", err)
+		}
 	}
 	pool, err := pgxpool.New(ctx, u.String())
 	if err != nil {

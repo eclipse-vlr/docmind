@@ -71,6 +71,31 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 
+  worker:
+    image: docmind-worker:local
+    build:
+      context: ..
+      target: worker
+    env_file:
+      - ../.env
+    environment:
+      STORAGE_DIR: /data/documents
+      DATABASE_URL: postgres://docmind:${POSTGRES_PASSWORD:-docmind_dev}@postgres:5432/docmind?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - document_files:/data/documents:ro
+    stop_grace_period: 10s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    cpus: 1.0
+    pids_limit: 64
+
 volumes:
   postgres_data:
   document_files:

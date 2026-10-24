@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -58,6 +59,39 @@ func createDirectory(directory string) error {
 }
 
 func (s *Store) Close() error { return s.root.Close() }
+
+// Read bounds allocations even if a stored file was replaced or corrupted.
+func (s *Store) Read(ctx context.Context, key string) ([]byte, error) {
+	if !documents.ValidID(key) {
+		return nil, documents.ErrInvalid
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	f, err := s.root.Open(key)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, documents.ErrInvalid
+	}
+	data, err := io.ReadAll(io.LimitReader(f, documents.MaxFileSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > documents.MaxFileSize {
+		return nil, documents.ErrTooLarge
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
 
 // Save syncs the file and its directory entry before publishing to the database.
 func (s *Store) Save(ctx context.Context, key string, data []byte) (err error) {
