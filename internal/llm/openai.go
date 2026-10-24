@@ -84,6 +84,9 @@ func (p *OpenAI) Embed(ctx context.Context, texts []string) ([][]float32, error)
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, ErrTimeout
+		}
 		return nil, ErrUnavailable
 	}
 	if len(raw) > maxResponseBytes {
