@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	Dimensions    = 1536
+	Dimensions    = 256
 	BatchSize     = 32
 	MaxInputBytes = 4000
 )
@@ -23,7 +23,8 @@ var (
 )
 
 // EmbeddingProvider preserves input order and returns nonzero finite vectors.
-// Model identifies the vector space, including the provider and model version.
+// Model identifies the shared vector space, including provider/version/dimension.
+// Paired document/query encoders must return the same Model identifier.
 type EmbeddingProvider interface {
 	Embed(context.Context, []string) ([][]float32, error)
 	Model() string

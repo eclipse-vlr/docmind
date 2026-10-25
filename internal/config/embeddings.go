@@ -7,14 +7,14 @@ import (
 	"docmind/internal/llm"
 )
 
-// Embeddings constructs the same fixed vector space for worker and search.
-func Embeddings(getenv func(string) string) (llm.EmbeddingProvider, error) {
+// Embeddings chooses the document or query encoder within one shared space.
+func Embeddings(getenv func(string) string, purpose llm.EmbeddingPurpose) (llm.EmbeddingProvider, error) {
 	provider := getenv("EMBEDDING_PROVIDER")
 	if provider == "" || provider == "fake" {
 		return llm.Fake{}, nil
 	}
-	if provider != "openai" {
-		return nil, errors.New("EMBEDDING_PROVIDER must be fake or openai")
+	if provider != "yandex" {
+		return nil, errors.New("EMBEDDING_PROVIDER must be fake or yandex")
 	}
 	timeout := 10 * time.Second
 	if value := getenv("EMBEDDING_HTTP_TIMEOUT"); value != "" {
@@ -24,5 +24,5 @@ func Embeddings(getenv func(string) string) (llm.EmbeddingProvider, error) {
 			return nil, errors.New("EMBEDDING_HTTP_TIMEOUT must be a positive duration up to 1m")
 		}
 	}
-	return llm.NewOpenAI(getenv("OPENAI_API_KEY"), timeout)
+	return llm.NewYandexEmbeddings(getenv("YANDEX_API_KEY"), getenv("YANDEX_FOLDER_ID"), purpose, timeout)
 }
