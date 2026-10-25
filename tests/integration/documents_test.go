@@ -126,7 +126,7 @@ func TestDocumentLifecycle(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	h := httpapi.NewHandler(f.repo.SchemaReady, time.Second, logger, f.service)
+	h := httpapi.NewHandler(f.repo.SchemaReady, time.Second, logger, f.service, nil)
 	a := upload(t, h, "first.txt")
 	b := upload(t, h, "second.md")
 	for _, id := range []string{a.ID, b.ID} {

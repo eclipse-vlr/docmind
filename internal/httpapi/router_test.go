@@ -38,7 +38,7 @@ func TestHealthRoutes(t *testing.T) {
 					t.Error("database check has no deadline")
 				}
 				return tc.dbErr
-			}, time.Second, slog.New(slog.NewJSONHandler(&logs, nil)), nil)
+			}, time.Second, slog.New(slog.NewJSONHandler(&logs, nil)), nil, nil)
 			w := httptest.NewRecorder()
 			h.ServeHTTP(w, httptest.NewRequest(tc.method, tc.path+"?token=private", nil))
 			if w.Code != tc.status || strings.TrimSpace(w.Body.String()) != tc.body {
@@ -84,7 +84,7 @@ func TestReadinessCancellation(t *testing.T) {
 				cancel()
 			}
 			var cause error
-			h := NewHandler(func(ctx context.Context) error { <-ctx.Done(); cause = ctx.Err(); return cause }, time.Millisecond, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+			h := NewHandler(func(ctx context.Context) error { <-ctx.Done(); cause = ctx.Err(); return cause }, time.Millisecond, slog.New(slog.NewTextHandler(io.Discard, nil)), nil, nil)
 			w := httptest.NewRecorder()
 			h.ServeHTTP(w, httptest.NewRequest("GET", "/readyz", nil).WithContext(ctx))
 			want := context.DeadlineExceeded
@@ -118,7 +118,7 @@ func TestRequestID(t *testing.T) {
 }
 
 func TestHeadHealth(t *testing.T) {
-	h := NewHandler(func(context.Context) error { return nil }, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	h := NewHandler(func(context.Context) error { return nil }, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil)), nil, nil)
 	server := httptest.NewServer(h)
 	defer server.Close()
 	for _, path := range []string{"/healthz", "/readyz"} {

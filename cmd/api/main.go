@@ -15,6 +15,7 @@ import (
 	"docmind/internal/config"
 	"docmind/internal/documents"
 	"docmind/internal/httpapi"
+	"docmind/internal/rag"
 	"docmind/internal/storage/local"
 	"docmind/internal/storage/postgres"
 )
@@ -30,6 +31,18 @@ func run() error {
 	cfg, err := config.Load(os.Getenv)
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
+	}
+	embeddings, err := config.Embeddings(os.Getenv)
+	if err != nil {
+		return err
+	}
+	chat, err := config.Chat(os.Getenv)
+	if err != nil {
+		return err
+	}
+	questionTimeout, err := config.QuestionTimeout(os.Getenv, cfg.WriteTimeout)
+	if err != nil {
+		return err
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -51,6 +64,7 @@ func run() error {
 	}
 	defer files.Close()
 	service := documents.NewService(db, files)
+	questions := rag.NewQuestions(rag.NewSearcher(db, embeddings), chat)
 	cleanupCtx, cancelCleanup := context.WithCancel(context.Background())
 	cleanupDone := make(chan struct{})
 	go func() {
@@ -74,7 +88,7 @@ func run() error {
 	defer func() { cancelCleanup(); <-cleanupDone }()
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.NewHandler(db.SchemaReady, cfg.DBTimeout, logger, service),
+		Handler:           httpapi.NewHandler(db.SchemaReady, cfg.DBTimeout, logger, service, &httpapi.QuestionOptions{Service: questions, Timeout: questionTimeout}),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,
 		WriteTimeout:      cfg.WriteTimeout,

@@ -9,10 +9,13 @@ import (
 	"time"
 )
 
-func NewHandler(ready func(context.Context) error, dbTimeout time.Duration, logger *slog.Logger, service DocumentService) http.Handler {
+func NewHandler(ready func(context.Context) error, dbTimeout time.Duration, logger *slog.Logger, service DocumentService, questions *QuestionOptions) http.Handler {
 	mux := http.NewServeMux()
 	if service != nil {
 		registerDocuments(mux, service, dbTimeout, logger)
+	}
+	if questions != nil && questions.Service != nil {
+		registerQuestions(mux, questions, logger)
 	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -28,6 +31,11 @@ func NewHandler(ready func(context.Context) error, dbTimeout time.Duration, logg
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if questions != nil && questions.Service != nil && r.URL.Path == "/api/v1/questions" {
+			w.Header().Set("Allow", "POST")
+			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method is not allowed")
+			return
+		}
 		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" {
 			w.Header().Set("Allow", "GET, HEAD")
 			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method is not allowed")

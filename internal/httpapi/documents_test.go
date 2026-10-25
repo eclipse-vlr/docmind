@@ -50,7 +50,7 @@ func (s *stubDocuments) Delete(_ context.Context, id string) error {
 }
 
 func documentHandler(s DocumentService) http.Handler {
-	return NewHandler(func(context.Context) error { return nil }, time.Second, slog.New(slog.NewJSONHandler(io.Discard, nil)), s)
+	return NewHandler(func(context.Context) error { return nil }, time.Second, slog.New(slog.NewJSONHandler(io.Discard, nil)), s, nil)
 }
 
 func uploadRequest(t *testing.T, name string, body []byte, extra bool) *http.Request {
