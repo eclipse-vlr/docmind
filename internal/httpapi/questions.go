@@ -8,8 +8,10 @@ import (
 	"io"
 	"log/slog"
 	"mime"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -19,6 +21,8 @@ import (
 )
 
 const maxQuestionBody = 16 << 10
+
+var errQuestionBodyTimeout = errors.New("question body read timed out")
 
 type QuestionService interface {
 	Ask(context.Context, string, []string) (rag.Answer, error)
@@ -56,16 +60,27 @@ func (h *questionHandlers) ask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Use application/json with UTF-8 encoding")
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxQuestionBody)
-	defer r.Body.Close()
-	raw, err := io.ReadAll(r.Body)
+	raw, err := readQuestionBody(ctx, w, r)
 	if err != nil {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
-			writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "Question body is too large")
-			return
+		// An incomplete HTTP/1 body cannot safely share a keep-alive connection.
+		if r.ProtoMajor == 1 {
+			w.Header().Set("Connection", "close")
 		}
-		h.fail(w, r, rag.ErrInvalid)
+		var tooLarge *http.MaxBytesError
+		var networkError net.Error
+		deadline, _ := ctx.Deadline()
+		switch {
+		case errors.As(err, &tooLarge):
+			writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "Question body is too large")
+		case errors.Is(err, context.DeadlineExceeded) || !time.Now().Before(deadline):
+			h.fail(w, r, context.DeadlineExceeded)
+		case errors.As(err, &networkError) && networkError.Timeout():
+			h.fail(w, r, errQuestionBodyTimeout)
+		case errors.Is(err, context.Canceled):
+			h.fail(w, r, context.Canceled)
+		default:
+			h.fail(w, r, rag.ErrInvalid)
+		}
 		return
 	}
 	if !utf8.Valid(raw) {
@@ -97,6 +112,47 @@ func (h *questionHandlers) ask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, answer)
 }
 
+// readQuestionBody owns the read, close and cancellation callback. A derived
+// context alone cannot interrupt net/http's body reads. Only expiring the read
+// deadline on cancellation preserves any earlier server ReadTimeout.
+func readQuestionBody(ctx context.Context, w http.ResponseWriter, r *http.Request) (data []byte, err error) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxQuestionBody)
+	controller := http.NewResponseController(w)
+	var closeOnce sync.Once
+	var closeErr error
+	closeBody := func() error {
+		closeOnce.Do(func() { closeErr = r.Body.Close() })
+		return closeErr
+	}
+	interrupted := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		defer close(interrupted)
+		if controller.SetReadDeadline(time.Now()) != nil {
+			// Request bodies must support concurrent Close to unblock Read.
+			_ = closeBody()
+		}
+	})
+	defer func() {
+		// Keep cancellation active during Close: net/http may drain unread data.
+		bodyErr := closeBody()
+		if !stop() {
+			<-interrupted
+		}
+		if err == nil {
+			err = bodyErr
+		}
+		if err == nil {
+			err = ctx.Err()
+		}
+	}()
+	data, err = io.ReadAll(r.Body)
+	if err != nil {
+		// Do not wait for an oversized or broken body to finish during Close.
+		_ = controller.SetReadDeadline(time.Now())
+	}
+	return data, err
+}
+
 func (h *questionHandlers) fail(w http.ResponseWriter, r *http.Request, err error) {
 	status, code, message := http.StatusInternalServerError, "internal_error", "Question processing failed"
 	switch {
@@ -118,6 +174,8 @@ func (h *questionHandlers) fail(w http.ResponseWriter, r *http.Request, err erro
 		status, code, message = 502, "provider_error", "Model provider could not produce a valid answer"
 	case errors.Is(err, context.Canceled):
 		status, code, message = 408, "request_canceled", "Request was canceled"
+	case errors.Is(err, errQuestionBodyTimeout):
+		status, code, message = 408, "request_body_timeout", "Question body read timed out"
 	}
 	if status == 503 {
 		w.Header().Set("Retry-After", "1")
