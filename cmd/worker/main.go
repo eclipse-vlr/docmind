@@ -11,6 +11,7 @@ import (
 
 	"docmind/internal/config"
 	"docmind/internal/ingestion"
+	"docmind/internal/llm"
 	"docmind/internal/storage/local"
 	"docmind/internal/storage/postgres"
 )
@@ -27,7 +28,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("load worker configuration: %w", err)
 	}
-	embeddings, err := config.Embeddings(os.Getenv)
+	embeddings, err := config.Embeddings(os.Getenv, llm.DocumentEmbedding)
 	if err != nil {
 		return err
 	}

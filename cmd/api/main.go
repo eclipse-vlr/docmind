@@ -15,6 +15,7 @@ import (
 	"docmind/internal/config"
 	"docmind/internal/documents"
 	"docmind/internal/httpapi"
+	"docmind/internal/llm"
 	"docmind/internal/rag"
 	"docmind/internal/storage/local"
 	"docmind/internal/storage/postgres"
@@ -32,7 +33,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
 	}
-	embeddings, err := config.Embeddings(os.Getenv)
+	embeddings, err := config.Embeddings(os.Getenv, llm.QueryEmbedding)
 	if err != nil {
 		return err
 	}

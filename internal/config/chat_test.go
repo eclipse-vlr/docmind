@@ -23,11 +23,13 @@ func TestChatConfig(t *testing.T) {
 	}{
 		{"fake", map[string]string{"CHAT_PROVIDER": "fake"}, true},
 		{"unknown provider", map[string]string{"CHAT_PROVIDER": "unknown"}, false},
-		{"missing key", map[string]string{"CHAT_PROVIDER": "openai"}, false},
-		{"openai", map[string]string{"CHAT_PROVIDER": "openai", "OPENAI_API_KEY": "test-secret"}, true},
-		{"bad timeout", map[string]string{"CHAT_PROVIDER": "openai", "OPENAI_API_KEY": "test-secret", "CHAT_HTTP_TIMEOUT": "bad"}, false},
-		{"zero timeout", map[string]string{"CHAT_PROVIDER": "openai", "OPENAI_API_KEY": "test-secret", "CHAT_HTTP_TIMEOUT": "0s"}, false},
-		{"large timeout", map[string]string{"CHAT_PROVIDER": "openai", "OPENAI_API_KEY": "test-secret", "CHAT_HTTP_TIMEOUT": "2m"}, false},
+		{"removed provider", map[string]string{"CHAT_PROVIDER": "openai"}, false},
+		{"missing folder", map[string]string{"CHAT_PROVIDER": "yandex", "YANDEX_API_KEY": "test-secret"}, false},
+		{"missing key", map[string]string{"CHAT_PROVIDER": "yandex"}, false},
+		{"yandex", map[string]string{"CHAT_PROVIDER": "yandex", "YANDEX_API_KEY": "test-secret", "YANDEX_FOLDER_ID": "test-folder"}, true},
+		{"bad timeout", map[string]string{"CHAT_PROVIDER": "yandex", "YANDEX_API_KEY": "test-secret", "YANDEX_FOLDER_ID": "test-folder", "CHAT_HTTP_TIMEOUT": "bad"}, false},
+		{"zero timeout", map[string]string{"CHAT_PROVIDER": "yandex", "YANDEX_API_KEY": "test-secret", "YANDEX_FOLDER_ID": "test-folder", "CHAT_HTTP_TIMEOUT": "0s"}, false},
+		{"large timeout", map[string]string{"CHAT_PROVIDER": "yandex", "YANDEX_API_KEY": "test-secret", "YANDEX_FOLDER_ID": "test-folder", "CHAT_HTTP_TIMEOUT": "2m"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := Chat(func(k string) string { return tc.env[k] })

@@ -1,10 +1,8 @@
 package llm
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -12,7 +10,7 @@ import (
 	"unicode/utf8"
 )
 
-const OpenAIChatModel = "gpt-5.6-terra"
+const YandexChatModel = "aliceai-llm"
 const maxChatResponseBytes = 128 << 10
 
 const answerInstructions = `Answer the question using only facts explicitly supported by the supplied fragments.
@@ -21,23 +19,21 @@ If fragments cannot support an answer, set insufficient_context=true, answer="",
 Otherwise answer concisely in the question's language, set insufficient_context=false, and cite only fragment IDs that directly support the answer.
 Do not put URLs, document IDs, chunk IDs, or citation markers into the answer; references are returned separately by the application.`
 
-type OpenAIChat struct {
+type YandexChat struct {
 	key      string
+	folder   string
 	client   *http.Client
 	endpoint string
 }
 
-func NewOpenAIChat(key string, timeout time.Duration) (*OpenAIChat, error) {
-	if strings.TrimSpace(key) == "" || strings.ContainsAny(key, "\r\n") {
-		return nil, errors.New("OPENAI_API_KEY is required for openai chat")
+func NewYandexChat(key, folder string, timeout time.Duration) (*YandexChat, error) {
+	client, err := newYandexClient(key, folder, timeout)
+	if err != nil {
+		return nil, err
 	}
-	if timeout <= 0 || timeout > time.Minute {
-		return nil, errors.New("invalid chat HTTP timeout")
-	}
-	return &OpenAIChat{key: key, endpoint: "https://api.openai.com/v1/responses", client: &http.Client{Timeout: timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	return &YandexChat{key: key, folder: folder, endpoint: "https://ai.api.cloud.yandex.net/v1/responses", client: client}, nil
 }
-
-func (p *OpenAIChat) Chat(ctx context.Context, in ChatRequest) (ChatResult, error) {
+func (p *YandexChat) Chat(ctx context.Context, in ChatRequest) (ChatResult, error) {
 	if err := validateChatInput(in); err != nil {
 		return ChatResult{}, err
 	}
@@ -53,9 +49,9 @@ func (p *OpenAIChat) Chat(ctx context.Context, in ChatRequest) (ChatResult, erro
 		ids[i] = f.ID
 	}
 	body, err := json.Marshal(map[string]any{
-		"model": OpenAIChatModel, "instructions": answerInstructions,
+		"model": "gpt://" + p.folder + "/" + YandexChatModel, "instructions": answerInstructions,
 		"input": []map[string]string{{"role": "user", "content": string(input)}},
-		"store": false, "max_output_tokens": 2048, "reasoning": map[string]string{"effort": "low"},
+		"store": false, "max_output_tokens": 2048,
 		"text": map[string]any{"format": map[string]any{
 			"type": "json_schema", "name": "document_answer", "strict": true,
 			"schema": map[string]any{"type": "object", "additionalProperties": false,
@@ -70,45 +66,11 @@ func (p *OpenAIChat) Chat(ctx context.Context, in ChatRequest) (ChatResult, erro
 	if err != nil {
 		return ChatResult{}, ErrInput
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.endpoint, bytes.NewReader(body))
+	raw, err := yandexRequest(ctx, p.client, p.endpoint, p.key, p.folder, body, maxChatResponseBytes)
 	if err != nil {
-		return ChatResult{}, ErrUnavailable
-	}
-	req.Header.Set("Authorization", "Bearer "+p.key)
-	req.Header.Set("Content-Type", "application/json")
-	res, err := p.client.Do(req)
-	if err != nil {
-		return ChatResult{}, chatTransportError(ctx, err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		switch {
-		case res.StatusCode == 408 || res.StatusCode == 504:
-			return ChatResult{}, ErrTimeout
-		case res.StatusCode == 429 || res.StatusCode >= 500:
-			return ChatResult{}, ErrUnavailable
-		default:
-			return ChatResult{}, ErrRejected
-		}
-	}
-	raw, err := io.ReadAll(io.LimitReader(res.Body, maxChatResponseBytes+1))
-	if err != nil {
-		return ChatResult{}, chatTransportError(ctx, err)
-	}
-	if len(raw) > maxChatResponseBytes {
-		return ChatResult{}, ErrResponse
+		return ChatResult{}, err
 	}
 	return decodeChatResponse(raw, in)
-}
-
-func chatTransportError(ctx context.Context, err error) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		return ErrTimeout
-	}
-	return ErrUnavailable
 }
 
 func decodeChatResponse(raw []byte, in ChatRequest) (ChatResult, error) {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"docmind/internal/config"
+	"docmind/internal/llm"
 	"docmind/internal/rag"
 	"docmind/internal/storage/postgres"
 )
@@ -31,7 +32,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	provider, err := config.Embeddings(os.Getenv)
+	provider, err := config.Embeddings(os.Getenv, llm.QueryEmbedding)
 	if err != nil {
 		return err
 	}

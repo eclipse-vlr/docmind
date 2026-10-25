@@ -12,8 +12,8 @@ func Chat(getenv func(string) string) (llm.ChatProvider, error) {
 	if provider == "" || provider == "fake" {
 		return llm.FakeChat{}, nil
 	}
-	if provider != "openai" {
-		return nil, errors.New("CHAT_PROVIDER must be fake or openai")
+	if provider != "yandex" {
+		return nil, errors.New("CHAT_PROVIDER must be fake or yandex")
 	}
 	timeout := 10 * time.Second
 	if value := getenv("CHAT_HTTP_TIMEOUT"); value != "" {
@@ -23,7 +23,7 @@ func Chat(getenv func(string) string) (llm.ChatProvider, error) {
 			return nil, errors.New("CHAT_HTTP_TIMEOUT must be a positive duration up to 1m")
 		}
 	}
-	return llm.NewOpenAIChat(getenv("OPENAI_API_KEY"), timeout)
+	return llm.NewYandexChat(getenv("YANDEX_API_KEY"), getenv("YANDEX_FOLDER_ID"), timeout)
 }
 
 func QuestionTimeout(getenv func(string) string, writeTimeout time.Duration) (time.Duration, error) {

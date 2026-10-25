@@ -12,7 +12,7 @@ import (
 // access or API keys; it does not model semantic similarity or synonyms.
 type Fake struct{}
 
-func (Fake) Model() string { return "fake-hash-v1" }
+func (Fake) Model() string { return "fake-hash-v2-256" }
 
 func (Fake) Embed(ctx context.Context, texts []string) ([][]float32, error) {
 	if err := validateInput(texts); err != nil {

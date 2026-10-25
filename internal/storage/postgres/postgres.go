@@ -58,7 +58,7 @@ func (s *Store) SchemaReady(ctx context.Context) error {
 		return err
 	}
 	var version string
-	if err := s.pool.QueryRow(ctx, "SELECT version FROM schema_migrations WHERE version='004_embeddings.up.sql' AND EXISTS (SELECT 1 FROM schema_migrations WHERE version='002_file_deletion_retries.up.sql')").Scan(&version); err != nil {
+	if err := s.pool.QueryRow(ctx, "SELECT version FROM schema_migrations WHERE version='005_yandex_embeddings.up.sql' AND EXISTS (SELECT 1 FROM schema_migrations WHERE version='002_file_deletion_retries.up.sql')").Scan(&version); err != nil {
 		return errors.New("documents schema is not ready; run migrations")
 	}
 	return nil
