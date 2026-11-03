@@ -1,0 +1,56 @@
+name: Go and PostgreSQL checks
+
+on:
+  push:
+    branches: [master, 'feature/**', 'fix/**', 'ci/**', 'docs/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg17
+        env:
+          POSTGRES_USER: docmind
+          POSTGRES_PASSWORD: docmind_ci
+          POSTGRES_DB: docmind_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U docmind -d docmind_ci"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://docmind:docmind_ci@127.0.0.1:5432/docmind_ci?sslmode=disable
+      CHAT_PROVIDER: fake
+      EMBEDDING_PROVIDER: fake
+      CGO_ENABLED: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: PDF parser dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils util-linux
+      - name: Formatting
+        run: test -z "$(gofmt -l cmd internal tests)"
+      - run: go mod verify
+      - run: go vet ./...
+      - name: Enable pgvector
+        run: psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+      - name: Unit and integration tests with race detector
+        run: go test -race -count=1 -timeout=120s ./...
+      - name: Build API, worker and tools
+        run: go build ./cmd/...
