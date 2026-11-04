@@ -20,11 +20,12 @@
   --on-accent: #fff;
   --source-border: #a7b99b;
   --focus: #9b710f;
-  font-family:
-    Segoe UI,
-    Arial,
-    sans-serif;
-  font-size: 15px;
+  --font-ui:
+    "Segoe UI Variable", "Segoe UI", system-ui, -apple-system,
+    BlinkMacSystemFont, Arial, sans-serif;
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 * {
@@ -101,7 +102,7 @@ textarea:focus-visible,
   line-height: 34px;
 }
 .edition {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 400;
   letter-spacing: 0;
   color: var(--muted);
@@ -113,7 +114,7 @@ textarea:focus-visible,
   display: flex;
   gap: 25px;
   align-items: center;
-  font-size: 12px;
+  font-size: 14px;
 }
 .connection {
   color: var(--muted);
@@ -143,8 +144,8 @@ textarea:focus-visible,
   background: var(--sidebar);
 }
 .section-label {
-  font-size: 10px;
-  letter-spacing: 1.8px;
+  font-size: 12px;
+  letter-spacing: 1px;
   font-weight: 650;
   color: var(--muted);
 }
@@ -161,14 +162,14 @@ h1 {
   font-weight: 600;
 }
 .count {
-  font-size: 11px;
+  font-size: 12px;
   background: var(--selection);
   padding: 3px 8px;
   border-radius: 5px;
 }
 .muted {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .upload {
@@ -199,11 +200,11 @@ h1 {
   cursor: pointer;
 }
 .upload strong {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
 }
 .upload > span:last-of-type {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .upload-plus {
@@ -217,7 +218,7 @@ h1 {
   align-items: center;
   justify-content: space-between;
   margin: 29px 0 13px;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 1px;
   color: var(--muted);
 }
@@ -226,12 +227,12 @@ h1 {
   border: 0;
   background: none;
   color: var(--green);
-  font-size: 12px;
+  font-size: 14px;
 }
 .document {
   display: flex;
   align-items: center;
-  padding: 13px 8px;
+  padding: 16px 12px;
   border-bottom: 1px solid var(--line);
   gap: 5px;
 }
@@ -249,12 +250,12 @@ h1 {
 }
 .document input {
   accent-color: var(--green);
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
 }
 .file-icon {
-  font-size: 10px;
+  font-size: 12px;
   border: 1px solid var(--upload-border);
   border-radius: 3px;
   padding: 8px 4px;
@@ -266,12 +267,12 @@ h1 {
   gap: 5px;
 }
 .document strong {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 .document small {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .delete {
@@ -286,7 +287,7 @@ h1 {
 }
 .library-note {
   margin-top: 30px;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.8;
   color: var(--muted);
 }
@@ -303,27 +304,27 @@ h1 {
   min-width: 0;
 }
 .desk-intro > .section-label {
-  margin-bottom: 54px;
+  margin-bottom: 30px;
 }
 .eyebrow {
-  font-size: 10px;
-  letter-spacing: 2px;
+  font-size: 12px;
+  letter-spacing: 0.1px;
   color: var(--green);
   font-weight: 600;
 }
 h2 {
-  font-family: Georgia, "Times New Roman", serif;
-  font-weight: 400;
-  font-size: clamp(34px, 3.7vw, 56px);
-  line-height: 1.12;
-  letter-spacing: -1.8px;
+  font-family: var(--font-ui);
+  font-weight: 650;
+  font-size: clamp(32px, 3.5vw, 48px);
+  line-height: 1.18;
+  letter-spacing: -1.1px;
   margin: 18px 0;
 }
 .accent {
   color: var(--green);
 }
 .desk-intro > p {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.85;
   color: var(--muted);
   margin-bottom: 32px;
@@ -331,7 +332,7 @@ h2 {
 .question-card {
   background: var(--surface);
   border: 1px solid var(--card-border);
-  border-radius: 10px;
+  border-radius: 14px;
   box-shadow: 0 5px 18px var(--shadow);
   overflow: hidden;
 }
@@ -340,26 +341,26 @@ h2 {
   justify-content: space-between;
   gap: 10px;
   padding: 19px 22px 0;
-  font-size: 12px;
+  font-size: 14px;
 }
 .question-meta label {
   font-weight: 600;
 }
 .question-meta span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 textarea {
   display: block;
   width: 100%;
   resize: vertical;
-  min-height: 110px;
+  min-height: 138px;
   max-height: 360px;
   padding: 20px 22px;
   border: 0;
   background: none;
   color: var(--ink);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.6;
 }
 textarea::placeholder {
@@ -374,7 +375,7 @@ textarea::placeholder {
   gap: 12px;
 }
 .composer-bottom > span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .primary {
@@ -383,10 +384,12 @@ textarea::placeholder {
   border: 0;
   border-radius: 6px;
   padding: 12px 18px;
-  font-size: 12px;
+  font-size: 14px;
   display: flex;
-  gap: 25px;
+  gap: 18px;
   align-items: center;
+  min-height: 46px;
+  font-weight: 600;
 }
 .primary:hover:enabled {
   background: var(--button-hover);
@@ -395,7 +398,7 @@ textarea::placeholder {
   font-size: 18px;
 }
 .feedback {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--green);
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -412,12 +415,12 @@ textarea::placeholder {
   color: var(--muted);
 }
 .empty-answer strong {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--ink);
 }
 .empty-answer p {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.8;
   margin-bottom: 0;
 }
@@ -447,21 +450,22 @@ textarea::placeholder {
   overflow-wrap: anywhere;
 }
 .result #answer {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 21px;
-  line-height: 1.75;
+  font-family: var(--font-ui);
+  font-size: 18px;
+  line-height: 1.85;
+  max-width: 72ch;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .source-heading {
   border-top: 1px solid var(--line);
   margin-top: 25px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .source-heading h3 {
   font-family: inherit;
-  font-size: 12px;
+  font-size: 14px;
 }
 .source {
   border-left: 2px solid var(--source-border);
@@ -469,13 +473,13 @@ textarea::placeholder {
   padding: 4px 16px;
 }
 .source summary {
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
   color: var(--green);
   overflow-wrap: anywhere;
 }
 .source blockquote {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.8;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -488,7 +492,7 @@ footer {
   gap: 16px;
   padding-top: 22px;
   border-top: 1px solid var(--line);
-  font-size: 9px;
+  font-size: 12px;
   color: var(--muted);
   letter-spacing: 0.3px;
 }
@@ -514,7 +518,7 @@ footer {
     display: none;
   }
   .desk-intro > .section-label {
-    margin-bottom: 35px;
+    margin-bottom: 26px;
   }
   .wide-only {
     display: none;
@@ -578,7 +582,7 @@ footer {
     margin-bottom: 27px;
   }
   h2 {
-    font-size: 37px;
+    font-size: 34px;
   }
   .question-meta {
     padding: 18px 16px 0;
@@ -593,7 +597,7 @@ footer {
     padding: 25px 0;
   }
   .result #answer {
-    font-size: 19px;
+    font-size: 17px;
   }
   footer {
     flex-direction: column;
@@ -824,7 +828,7 @@ footer {
   }
   .topbar .connection {
     max-width: none;
-    font-size: 10px;
+    font-size: 12px;
   }
   .topbar .connection::before {
     margin-right: 5px;
@@ -843,6 +847,101 @@ footer {
     gap: 8px;
   }
   .topbar nav > a {
-    font-size: 10px;
+    font-size: 12px;
+  }
+}
+
+/* Reading rhythm: consistent sans-serif and room for real document titles. */
+.desk-intro > p {
+  max-width: 60ch;
+  line-height: 1.75;
+}
+.question-card,
+.result,
+.empty-answer,
+.desk > footer {
+  max-width: 960px;
+}
+.question-meta label {
+  font-size: 16px;
+}
+.question-meta {
+  align-items: baseline;
+}
+.document {
+  margin-bottom: 6px;
+}
+.document-info {
+  gap: 6px;
+}
+.document strong {
+  line-height: 1.5;
+}
+.document small {
+  line-height: 1.6;
+}
+.delete {
+  min-width: 40px;
+  min-height: 40px;
+}
+.source blockquote {
+  max-width: 74ch;
+  color: var(--ink);
+  line-height: 1.85;
+}
+.source summary {
+  font-weight: 600;
+}
+.result h3 {
+  line-height: 1.6;
+}
+.empty-answer {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  margin: 18px 0 30px;
+  padding: 25px;
+}
+.empty-answer strong {
+  font-weight: 600;
+}
+.library-note {
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 850px) {
+  .question-meta {
+    align-items: flex-start;
+  }
+}
+@media (max-width: 600px) {
+  .empty-answer {
+    padding: 20px 16px;
+    gap: 16px;
+  }
+  .composer-bottom {
+    gap: 16px;
+  }
+  .primary {
+    width: 100%;
+    justify-content: center;
+  }
+  .topbar .connection {
+    font-size: 12px;
+  }
+}
+@media (max-width: 420px) {
+  .topbar .edition {
+    display: none;
+  }
+  .topbar .connection {
+    font-size: 12px;
+  }
+  .topbar nav > a {
+    display: none;
+  }
+  .topbar .connection::before {
+    width: 8px;
+    height: 8px;
+    margin: 0;
   }
 }
