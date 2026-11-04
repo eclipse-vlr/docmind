@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>DocMind — работа с документами</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23245b46'/%3E%3Ctext x='7' y='31' font-family='Georgia' font-size='34' fill='white'%3Ed.%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/app.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="DocMind — главная"
+        ><span class="mark" aria-hidden="true">d.</span>DocMind<span
+          class="edition"
+          >Личная библиотека</span
+        ></a
+      >
+      <nav aria-label="Сервис">
+        <a href="/openapi.yaml">API ↗</a
+        ><span class="connection" id="connection" role="status"
+          >Проверяем связь…</span
+        >
+      </nav>
+    </header>
+    <main class="workspace">
+      <aside class="library" aria-labelledby="library-title">
+        <div class="section-label">01 / ИСТОЧНИКИ</div>
+        <div class="library-heading">
+          <h1 id="library-title">Документы</h1>
+          <span id="doc-count" class="count">0</span>
+        </div>
+        <p class="muted">
+          Соберите материалы для ответа. <br />Выберите до 20 готовых
+          документов.
+        </p>
+        <label class="upload" id="dropzone"
+          ><span class="upload-plus" aria-hidden="true">+</span
+          ><strong>Добавить документ</strong
+          ><span>TXT, Markdown или PDF · до 10 MiB</span
+          ><input
+            id="file"
+            type="file"
+            accept=".txt,.md,.markdown,.pdf"
+            aria-label="Загрузить документ"
+        /></label>
+        <p id="upload-status" class="feedback" role="status"></p>
+        <div class="list-heading">
+          <span>ВАША БИБЛИОТЕКА</span
+          ><button id="refresh" class="text-button" type="button">
+            Обновить
+          </button>
+        </div>
+        <div id="documents" aria-live="polite"></div>
+        <button id="more" class="secondary" type="button" hidden>
+          Показать ещё
+        </button>
+        <p class="library-note">
+          Документы хранятся локально.<br />Для ответа используются только
+          выбранные материалы.
+        </p>
+      </aside>
+      <section class="desk" aria-labelledby="desk-title">
+        <div class="desk-intro">
+          <div class="section-label">02 / РАБОТА С ТЕКСТОМ</div>
+          <span class="eyebrow">ОТ ВОПРОСА — К ИСТОЧНИКУ</span>
+          <h2 id="desk-title">
+            Ответы начинаются<br />с ваших документов<span class="accent"
+              >.</span
+            >
+          </h2>
+          <p>
+            Задайте вопрос. DocMind найдёт подходящие фрагменты<br
+              class="wide-only"
+            />
+            и приложит их к ответу — чтобы вы могли проверить выводы.
+          </p>
+        </div>
+        <div class="question-card">
+          <div class="question-meta">
+            <label for="question">Что хотите узнать?</label
+            ><span id="selection-count">Документы не выбраны</span>
+          </div>
+          <form id="question-form">
+            <textarea
+              id="question"
+              rows="3"
+              placeholder="Например: какие ограничения описаны в документе?"
+              required
+              aria-describedby="question-help"
+            ></textarea>
+            <div class="composer-bottom">
+              <span id="question-help"
+                >До 4000 байт · Ctrl + Enter для отправки</span
+              ><button id="ask" class="primary" disabled type="submit">
+                Найти ответ <span aria-hidden="true">↗</span>
+              </button>
+            </div>
+          </form>
+        </div>
+        <p id="question-status" class="feedback" role="status"></p>
+        <section
+          id="result"
+          class="result"
+          hidden
+          aria-labelledby="answer-title"
+        >
+          <div class="answer-heading">
+            <span class="section-label">ОТВЕТ</span
+            ><button id="copy" class="text-button" type="button">
+              Копировать
+            </button>
+          </div>
+          <h3 id="answer-title"></h3>
+          <p id="answer"></p>
+          <div class="source-heading">
+            <h3>Источники</h3>
+            <span id="source-count"></span>
+          </div>
+          <div id="sources"></div>
+          <p class="muted">
+            Ссылки ведут к найденным фрагментам. Проверяйте выводы модели по
+            тексту.
+          </p>
+        </section>
+        <div id="empty-answer" class="empty-answer">
+          <span class="paper-icon" aria-hidden="true">≡</span>
+          <div>
+            <strong>Сначала материал. Затем — ясность.</strong>
+            <p>
+              Загрузите документ слева. Когда он будет готов,<br
+                class="wide-only"
+              />
+              выберите его и задайте первый вопрос.
+            </p>
+          </div>
+        </div>
+        <footer>
+          <span>DocMind / рабочее пространство</span
+          ><span>Текст → поиск → ответ с источниками</span>
+        </footer>
+      </section>
+    </main>
+    <template id="document-template"
+      ><article class="document">
+        <label
+          ><input type="checkbox" /><span
+            class="file-icon"
+            aria-hidden="true"
+          ></span
+          ><span class="document-info"
+            ><strong></strong><small></small></span></label
+        ><button class="delete" type="button" aria-label="Удалить документ">
+          ×
+        </button>
+      </article></template
+    >
+  </body>
+</html>
