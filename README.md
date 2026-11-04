@@ -9,6 +9,10 @@ DocMind — сервис на Go, который отвечает на вопр�
 Для генерации ответов подключена Alice AI LLM через Yandex AI Studio.
 По умолчанию работает тестовый режим `fake`: без внешних запросов и оплаты.
 
+В браузере доступно рабочее пространство: загрузка, выбор готовых документов,
+вопросы и раскрываемые фрагменты источников. Интерфейс встроен в Go-бинарник,
+отдельный frontend-сервер и установка JavaScript-пакетов не нужны.
+
 ## Запуск
 
 Нужен Docker Desktop в режиме Linux-контейнеров. Выполните из корня проекта в PowerShell:
@@ -24,6 +28,9 @@ curl.exe "$base/readyz"
 $document = curl.exe -F 'file=@example.txt' "$base/api/v1/documents" | ConvertFrom-Json
 curl.exe "$base/api/v1/documents/$($document.id)"
 ```
+
+Откройте [рабочее пространство](http://localhost:8080) в браузере.
+Контракт API: [api/openapi.yaml](api/openapi.yaml), также `GET /openapi.yaml`.
 
 Загрузка возвращает ID документа и статус `queued`. Обработка идёт в фоне.
 Повторяйте последний запрос, пока статус не станет `ready`. Если обработка завершилась
@@ -126,6 +133,30 @@ Workflow [Go and PostgreSQL checks](https://github.com/eclipse-vlr/docmind/actio
 с Poppler. Внешние модели заменены тестовыми адаптерами; платные API не вызываются.
 Результаты доступны по ссылке на workflow для каждого коммита. Локальные тесты
 не заменяют завершённый удалённый прогон той версии, которую вы проверяете.
+
+Отдельное задание CI поднимает Compose с fake-провайдерами и проверяет реальный
+сценарий HTTP → файл → worker → индекс → вопрос с источниками → удаление.
+Для локального прогона на отдельном тестовом экземпляре с обоими провайдерами `fake`:
+
+```powershell
+$env:DOCMIND_BASE_URL = 'http://localhost:8080'
+go test -count=1 -timeout=120s -v ./tests/smoke
+Remove-Item Env:DOCMIND_BASE_URL
+```
+
+`GET /metrics` отдаёт Prometheus text format: `docmind_http_requests_total`
+и `docmind_http_request_duration_seconds` (count/sum, без квантилей).
+Метки — шаблон маршрута, ограниченный набор методов, класс статуса.
+Метрики относятся к текущему процессу API и сбрасываются при перезапуске;
+сами обращения к `/metrics` не учитываются. Пример средней задержки:
+`sum(rate(docmind_http_request_duration_seconds_sum[5m])) / sum(rate(docmind_http_request_duration_seconds_count[5m]))`.
+В логах — request ID, маршрут, метод, статус и длительность; имена файлов,
+вопросы, тексты, ключи и параметры URL не записываются.
+
+Путь загрузки: браузер → HTTP API → приватные файлы + PostgreSQL → worker → индекс.
+Путь вопроса: HTTP API → embeddings вопроса → поиск pgvector → модель → проверенные
+ID фрагментов. Интерфейс и OpenAPI встроены через `go:embed`; бизнес-логика остаётся
+в `documents` и `rag`, SQL — в `storage/postgres`. Новых runtime-зависимостей нет.
 
 Проверка живого Yandex API выполняется отдельно по разделу «Alice AI» с собственными
 ключами и биллингом. Тесты адаптеров с подменой HTTP не подтверждают доступность

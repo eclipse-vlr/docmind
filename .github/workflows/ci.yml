@@ -45,7 +45,7 @@ jobs:
       - name: PDF parser dependencies
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils util-linux
       - name: Formatting
-        run: test -z "$(gofmt -l cmd internal tests)"
+        run: test -z "$(gofmt -l cmd internal tests api migrations)"
       - run: go mod verify
       - run: go vet ./...
       - name: Enable pgvector
@@ -54,3 +54,26 @@ jobs:
         run: go test -race -count=1 -timeout=120s ./...
       - name: Build API, worker and tools
         run: go build ./cmd/...
+
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Start isolated fake stack
+        run: |
+          cp .env.example .env
+          docker compose -p docmind-ci --env-file .env.example -f deploy/docker-compose.yml up -d --build
+      - name: HTTP to worker to answer smoke
+        env:
+          DOCMIND_BASE_URL: http://127.0.0.1:8080
+        run: go test -count=1 -timeout=120s -v ./tests/smoke
+      - name: Clean up isolated stack
+        if: always()
+        run: docker compose -p docmind-ci --env-file .env.example -f deploy/docker-compose.yml down -v
