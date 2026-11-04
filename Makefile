@@ -1,4 +1,4 @@
-.PHONY: fmt vet test test-docker test-integration build run worker migrate up down logs
+.PHONY: fmt vet test test-ui test-docker test-integration build run worker migrate up down logs
 
 fmt:
 	go fmt ./...
@@ -8,6 +8,9 @@ vet:
 
 test:
 	go test ./...
+
+test-ui:
+	node --test tests/frontend/workspace.test.js
 
 test-docker:
 	docker build --target test -t docmind-test .

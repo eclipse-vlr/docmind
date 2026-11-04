@@ -3,8 +3,11 @@ const $ = (id) => document.getElementById(id);
 const state = {
   documents: [],
   selected: new Set(),
+  rows: new Map(),
   limit: 20,
-  loading: false,
+  hasMore: false,
+  loading: null,
+  reloadRequested: false,
   asking: false,
   uploading: false,
 };
@@ -64,77 +67,130 @@ function updateSelection() {
     state.asking || !state.selected.size || !$("question").value.trim();
 }
 function renderDocuments() {
-  $("documents").replaceChildren();
+  const container = $("documents");
+  const visible = new Set(state.documents.map((doc) => doc.id));
+  for (const [id, row] of state.rows) {
+    if (!visible.has(id)) {
+      row.remove();
+      state.rows.delete(id);
+    }
+  }
   $("doc-count").textContent = state.documents.length;
   if (!state.documents.length) {
     const p = document.createElement("p");
-    p.className = "muted";
+    p.className = "muted empty-documents";
     p.textContent = "Здесь появятся ваши документы.";
-    $("documents").append(p);
+    container.replaceChildren(p);
+  } else {
+    container.querySelector(".empty-documents")?.remove();
   }
-  for (const doc of state.documents) {
-    const node = $("document-template").content.cloneNode(true),
-      row = node.querySelector("article"),
-      input = node.querySelector("input");
-    node.querySelector("strong").textContent = doc.original_name;
-    node.querySelector("small").textContent =
+  for (const [index, doc] of state.documents.entries()) {
+    let row = state.rows.get(doc.id);
+    if (!row) {
+      row = createDocumentRow(doc);
+      state.rows.set(doc.id, row);
+    }
+    const input = row.querySelector("input");
+    row.querySelector("strong").textContent = doc.original_name;
+    row.querySelector("small").textContent =
       `${statuses[doc.status] || doc.status} · ${Math.max(1, Math.round(doc.size_bytes / 1024))} КБ`;
-    node.querySelector(".file-icon").textContent =
+    row.querySelector(".file-icon").textContent =
       doc.mime_type === "application/pdf" ? "PDF" : "TXT";
     input.checked = state.selected.has(doc.id);
     input.disabled = doc.status !== "ready";
-    input.addEventListener("change", () => {
-      if (input.checked && state.selected.size >= 20) {
-        input.checked = false;
-        feedback("upload-status", "Можно выбрать до 20 документов.", true);
-        return;
-      }
-      if (input.checked) state.selected.add(doc.id);
-      else state.selected.delete(doc.id);
-      updateSelection();
-    });
-    if (doc.status === "failed")
-      row.title = doc.error_message || "Документ не удалось обработать";
-    const del = node.querySelector(".delete");
-    del.setAttribute("aria-label", `Удалить ${doc.original_name}`);
-    del.addEventListener("click", async () => {
-      if (!confirm(`Удалить «${doc.original_name}» и его индекс?`)) return;
-      del.disabled = true;
-      try {
-        await request(`/api/v1/documents/${doc.id}`, { method: "DELETE" });
-        state.selected.delete(doc.id);
-        await loadDocuments();
-        feedback("upload-status", "Документ удалён.");
-      } catch (e) {
-        feedback("upload-status", e.message, true);
-        del.disabled = false;
-      }
-    });
-    $("documents").append(node);
+    row.title =
+      doc.status === "failed"
+        ? doc.error_message || "Документ не удалось обработать"
+        : "";
+    // Keep existing controls attached: polling must not steal checkbox focus.
+    if (container.children[index] !== row)
+      container.insertBefore(row, container.children[index] || null);
   }
-  $("more").hidden = state.documents.length < state.limit || state.limit >= 100;
+  $("more").hidden = !state.hasMore;
   updateSelection();
 }
-async function loadDocuments() {
-  if (state.loading) return;
-  state.loading = true;
+
+function createDocumentRow(doc) {
+  const node = $("document-template").content.cloneNode(true);
+  const row = node.querySelector("article"),
+    input = row.querySelector("input");
+  input.addEventListener("change", () => {
+    if (input.checked && state.selected.size >= 20) {
+      input.checked = false;
+      feedback("upload-status", "Можно выбрать до 20 документов.", true);
+      return;
+    }
+    if (input.checked) state.selected.add(doc.id);
+    else state.selected.delete(doc.id);
+    updateSelection();
+  });
+  const del = row.querySelector(".delete");
+  del.setAttribute("aria-label", `Удалить ${doc.original_name}`);
+  del.addEventListener("click", async () => {
+    if (!confirm(`Удалить «${doc.original_name}» и его индекс?`)) return;
+    del.disabled = true;
+    try {
+      await request(`/api/v1/documents/${doc.id}`, { method: "DELETE" });
+      state.selected.delete(doc.id);
+      await loadDocuments();
+      feedback("upload-status", "Документ удалён.");
+    } catch (e) {
+      feedback("upload-status", e.message, true);
+      del.disabled = false;
+    }
+  });
+  return row;
+}
+
+function loadDocuments() {
+  state.reloadRequested = true;
+  if (!state.loading) state.loading = refreshDocuments();
+  return state.loading;
+}
+
+async function refreshDocuments() {
   $("refresh").disabled = true;
+  $("more").disabled = true;
   try {
-    const data = await request(
-      `/api/v1/documents?limit=${state.limit}&offset=0`,
-    );
-    state.documents = data.items;
-    const ready = new Set(
-      data.items.filter((d) => d.status === "ready").map((d) => d.id),
-    );
-    for (const id of state.selected)
-      if (!ready.has(id)) state.selected.delete(id);
-    renderDocuments();
-  } catch (e) {
-    feedback("upload-status", e.message, true);
+    do {
+      state.reloadRequested = false;
+      try {
+        const documents = new Map(),
+          limit = state.limit;
+        let hasMore = false;
+        // API pages allow at most 100 records and an offset up to 100000.
+        for (let offset = 0; offset < limit && offset <= 100000;) {
+          const pageSize = Math.min(100, limit - offset);
+          const data = await request(
+            `/api/v1/documents?limit=${pageSize}&offset=${offset}`,
+          );
+          if (state.reloadRequested) break;
+          for (const doc of data.items)
+            if (!documents.has(doc.id)) documents.set(doc.id, doc);
+          hasMore =
+            data.items.length === pageSize &&
+            (offset < 100000 || pageSize < 100);
+          offset += pageSize;
+          if (data.items.length < pageSize) break;
+        }
+        // An upload/delete requested a newer snapshot; discard this response.
+        if (state.reloadRequested) continue;
+        state.documents = [...documents.values()];
+        state.hasMore = hasMore;
+        const ready = new Set(
+          state.documents.filter((d) => d.status === "ready").map((d) => d.id),
+        );
+        for (const id of state.selected)
+          if (!ready.has(id)) state.selected.delete(id);
+        renderDocuments();
+      } catch (e) {
+        if (!state.reloadRequested) feedback("upload-status", e.message, true);
+      }
+    } while (state.reloadRequested);
   } finally {
-    state.loading = false;
+    state.loading = null;
     $("refresh").disabled = false;
+    $("more").disabled = false;
   }
 }
 async function upload(file) {
@@ -177,7 +233,8 @@ for (const type of ["dragleave", "drop"])
 $("dropzone").addEventListener("drop", (e) => upload(e.dataTransfer.files[0]));
 $("refresh").addEventListener("click", loadDocuments);
 $("more").addEventListener("click", () => {
-  state.limit = Math.min(100, state.limit + 20);
+  if (state.loading || !state.hasMore) return;
+  state.limit += 20;
   loadDocuments();
 });
 $("question").addEventListener("input", updateSelection);
@@ -269,7 +326,7 @@ connection();
 setInterval(() => {
   if (
     !document.hidden &&
-    !$("documents").contains(document.activeElement) &&
+    !state.loading &&
     state.documents.some(
       (d) => d.status === "queued" || d.status === "processing",
     )

@@ -8,9 +8,10 @@ RUN --mount=type=secret,id=proxy_ca \
 COPY . .
 
 FROM source AS test
-RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils util-linux \
+RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils util-linux nodejs \
     && rm -rf /var/lib/apt/lists/*
-RUN go vet ./... && go test -race -count=1 ./...
+RUN node --test tests/frontend/workspace.test.js \
+    && go vet ./... && go test -race -count=1 ./...
 
 FROM source AS build
 RUN CGO_ENABLED=0 go build -trimpath -o /out/docmind-api ./cmd/api \
