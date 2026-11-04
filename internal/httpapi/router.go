@@ -11,6 +11,9 @@ import (
 
 func NewHandler(ready func(context.Context) error, dbTimeout time.Duration, logger *slog.Logger, service DocumentService, questions *QuestionOptions) http.Handler {
 	mux := http.NewServeMux()
+	metrics := newHTTPMetrics()
+	mux.Handle("GET /metrics", metrics)
+	registerWorkspace(mux)
 	if service != nil {
 		registerDocuments(mux, service, dbTimeout, logger)
 	}
@@ -57,7 +60,7 @@ func NewHandler(ready func(context.Context) error, dbTimeout time.Duration, logg
 		}
 		writeError(w, http.StatusNotFound, "not_found", "Endpoint not found")
 	})
-	return observe(mux, logger)
+	return observe(metrics.wrap(mux), logger)
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {

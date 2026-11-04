@@ -12,3 +12,5 @@ AGENTS.md
 .agents
 docs/stage-*.md
 docs/CONTINUE_LOCAL.md
+docs/
+.playwright-cli/

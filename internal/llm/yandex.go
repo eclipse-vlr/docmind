@@ -36,7 +36,9 @@ func NewYandexEmbeddings(key, folder string, purpose EmbeddingPurpose, timeout t
 	if err != nil {
 		return nil, err
 	}
-	return &YandexEmbeddings{key: key, folder: folder, modelURI: "emb://" + folder + "/text-embeddings-v2-" + string(purpose) + "/", client: client, endpoint: "https://ai.api.cloud.yandex.net/v1/embeddings"}, nil
+	// The compatible API requires an explicit version even though the model
+	// catalog also documents a trailing-slash URI. An empty version returns 400.
+	return &YandexEmbeddings{key: key, folder: folder, modelURI: "emb://" + folder + "/text-embeddings-v2-" + string(purpose) + "/latest", client: client, endpoint: "https://ai.api.cloud.yandex.net/v1/embeddings"}, nil
 }
 
 func (*YandexEmbeddings) Model() string { return yandexEmbeddingSpace }

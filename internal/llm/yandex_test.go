@@ -39,7 +39,7 @@ func TestYandexEmbeddingRolesAndOrder(t *testing.T) {
 					Dimensions int    `json:"dimensions"`
 					Encoding   string `json:"encoding_format"`
 				}
-				if json.NewDecoder(r.Body).Decode(&body) != nil || body.Model != "emb://test-folder/text-embeddings-v2-"+string(purpose)+"/" || body.Dimensions != 256 || body.Encoding != "float" {
+				if json.NewDecoder(r.Body).Decode(&body) != nil || body.Model != "emb://test-folder/text-embeddings-v2-"+string(purpose)+"/latest" || body.Dimensions != 256 || body.Encoding != "float" {
 					t.Error("invalid embedding request")
 				}
 				n := calls.Add(1)

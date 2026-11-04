@@ -50,7 +50,7 @@ func observe(next http.Handler, logger *slog.Logger) http.Handler {
 				status = http.StatusOK
 			}
 			logger.InfoContext(r.Context(), "http_request",
-				"request_id", id, "method", r.Method, "route", r.Pattern,
+				"request_id", id, "method", boundedMethod(r.Method), "route", r.Pattern,
 				"status", status, "duration_ms", time.Since(start).Milliseconds())
 		}()
 		next.ServeHTTP(response, r)
