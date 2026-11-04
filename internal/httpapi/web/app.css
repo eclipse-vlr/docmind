@@ -603,26 +603,30 @@ footer {
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --paper: #171d1b;
-  --surface: #1d2622;
-  --sidebar: #141b18;
-  --ink: #e6ece6;
-  --muted: #a4b4aa;
-  --green: #a2d3b8;
-  --line: #33443a;
-  --soft: #25362b;
+  --paper: #111111;
+  --surface: #1a1a1a;
+  --sidebar: #0d0d0d;
+  --ink: #f1f1f1;
+  --muted: #aaaaaa;
+  --green: #dedede;
+  --line: #303030;
+  --soft: #242424;
   --danger: #ffaaa0;
-  --selection: #2a4032;
-  --upload-border: #657e6d;
-  --upload-bg: #1a241e;
-  --hover: #24392b;
-  --card-border: #49624f;
+  --selection: #303030;
+  --upload-border: #666666;
+  --upload-bg: #181818;
+  --hover: #262626;
+  --card-border: #454545;
   --shadow: #00000026;
-  --button-bg: #afd6b7;
-  --button-hover: #c4e7cb;
-  --on-accent: #15251a;
-  --source-border: #7ca48a;
-  --focus: #e4bf72;
+  --button-bg: #e6e6e6;
+  --button-hover: #ffffff;
+  --on-accent: #111111;
+  --source-border: #888888;
+  --focus: #eeeeee;
+}
+
+[data-theme="dark"] .connection::before {
+  background: var(--muted);
 }
 
 .theme-toggle {
