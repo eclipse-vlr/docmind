@@ -8,6 +8,7 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='8' fill='%23245b46'/%3E%3Ctext x='7' y='31' font-family='Georgia' font-size='34' fill='white'%3Ed.%3C/text%3E%3C/svg%3E"
     />
+    <script src="/theme.js"></script>
     <link rel="stylesheet" href="/app.css" />
     <script src="/app.js" defer></script>
   </head>
@@ -20,6 +21,37 @@
         ></a
       >
       <nav aria-label="Сервис">
+        <button
+          class="theme-toggle"
+          id="theme-toggle"
+          type="button"
+          aria-label="Включить тёмную тему"
+          aria-pressed="false"
+        >
+          <svg
+            class="theme-moon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            aria-hidden="true"
+          >
+            <path d="M20.8 13.1A9 9 0 0 1 10.9 3.2a9 9 0 1 0 9.9 9.9Z" />
+          </svg>
+          <svg
+            class="theme-sun"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="4" />
+            <path
+              d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"
+            />
+          </svg>
+        </button>
         <a href="/openapi.yaml">API ↗</a
         ><span class="connection" id="connection" role="status"
           >Проверяем связь…</span

@@ -8,12 +8,25 @@
   --line: #dfe3db;
   --soft: #edf1e9;
   --danger: #a13328;
+  --sidebar: #f0f2eb;
+  --selection: #e0eadc;
+  --upload-border: #9ba999;
+  --upload-bg: #f8faf5;
+  --hover: #e7eee1;
+  --card-border: #cbd6c8;
+  --shadow: #2233220a;
+  --button-hover: #174533;
+  --button-bg: #245b46;
+  --on-accent: #fff;
+  --source-border: #a7b99b;
+  --focus: #9b710f;
   font-family:
     Segoe UI,
     Arial,
     sans-serif;
   font-size: 15px;
 }
+
 * {
   box-sizing: border-box;
 }
@@ -53,7 +66,7 @@ a:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 .upload:focus-within {
-  outline: 3px solid #9b710f;
+  outline: 3px solid var(--focus);
   outline-offset: 4px;
 }
 [hidden] {
@@ -77,8 +90,8 @@ textarea:focus-visible,
   letter-spacing: -1px;
 }
 .mark {
-  background: var(--green);
-  color: #fff;
+  background: var(--button-bg);
+  color: var(--on-accent);
   border-radius: 9px;
   width: 37px;
   height: 37px;
@@ -127,7 +140,7 @@ textarea:focus-visible,
 .library {
   padding: 36px 25px 24px 36px;
   border-right: 1px solid var(--line);
-  background: #f3f4ee;
+  background: var(--sidebar);
 }
 .section-label {
   font-size: 10px;
@@ -149,7 +162,7 @@ h1 {
 }
 .count {
   font-size: 11px;
-  background: #e1e7dc;
+  background: var(--selection);
   padding: 3px 8px;
   border-radius: 5px;
 }
@@ -166,16 +179,16 @@ h1 {
   gap: 9px;
   margin-top: 25px;
   padding: 23px 10px;
-  border: 1px dashed #9ba999;
+  border: 1px dashed var(--upload-border);
   border-radius: 8px;
-  background: #fafbf8;
+  background: var(--upload-bg);
   cursor: pointer;
   text-align: center;
 }
 .upload:hover,
 .upload.dragging {
   border-color: var(--green);
-  background: #e7eee1;
+  background: var(--hover);
 }
 .upload input {
   position: absolute;
@@ -223,7 +236,7 @@ h1 {
   gap: 5px;
 }
 .document:has(input:checked) {
-  background: #e5ecdf;
+  background: var(--selection);
   border-radius: 5px;
 }
 .document label {
@@ -242,7 +255,7 @@ h1 {
 }
 .file-icon {
   font-size: 10px;
-  border: 1px solid #b1bcb0;
+  border: 1px solid var(--upload-border);
   border-radius: 3px;
   padding: 8px 4px;
   color: var(--green);
@@ -317,9 +330,9 @@ h2 {
 }
 .question-card {
   background: var(--surface);
-  border: 1px solid #ccd5ca;
+  border: 1px solid var(--card-border);
   border-radius: 10px;
-  box-shadow: 0 5px 18px #22332205;
+  box-shadow: 0 5px 18px var(--shadow);
   overflow: hidden;
 }
 .question-meta {
@@ -350,10 +363,10 @@ textarea {
   line-height: 1.6;
 }
 textarea::placeholder {
-  color: #78817b;
+  color: var(--muted);
 }
 .composer-bottom {
-  border-top: 1px solid #ecefe8;
+  border-top: 1px solid var(--line);
   padding: 12px 16px 12px 22px;
   display: flex;
   align-items: center;
@@ -365,8 +378,8 @@ textarea::placeholder {
   color: var(--muted);
 }
 .primary {
-  background: var(--green);
-  color: #fff;
+  background: var(--button-bg);
+  color: var(--on-accent);
   border: 0;
   border-radius: 6px;
   padding: 12px 18px;
@@ -376,7 +389,7 @@ textarea::placeholder {
   align-items: center;
 }
 .primary:hover:enabled {
-  background: #174533;
+  background: var(--button-hover);
 }
 .primary span {
   font-size: 18px;
@@ -401,7 +414,7 @@ textarea::placeholder {
 .empty-answer strong {
   font-size: 13px;
   font-weight: 500;
-  color: #4e5b53;
+  color: var(--ink);
 }
 .empty-answer p {
   font-size: 12px;
@@ -411,12 +424,12 @@ textarea::placeholder {
 .paper-icon {
   display: block;
   font-family: Georgia, serif;
-  border: 1px solid #c9d1c2;
+  border: 1px solid var(--line);
   border-radius: 4px;
   transform: rotate(-7deg);
   padding: 5px 14px;
   font-size: 35px;
-  color: #9baa95;
+  color: var(--muted);
 }
 .result {
   border-top: 1px solid var(--line);
@@ -451,7 +464,7 @@ textarea::placeholder {
   font-size: 12px;
 }
 .source {
-  border-left: 2px solid #a7b99b;
+  border-left: 2px solid var(--source-border);
   margin: 12px 0;
   padding: 4px 16px;
 }
@@ -585,5 +598,247 @@ footer {
   footer {
     flex-direction: column;
     gap: 7px;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #171d1b;
+  --surface: #1d2622;
+  --sidebar: #141b18;
+  --ink: #e6ece6;
+  --muted: #a4b4aa;
+  --green: #a2d3b8;
+  --line: #33443a;
+  --soft: #25362b;
+  --danger: #ffaaa0;
+  --selection: #2a4032;
+  --upload-border: #657e6d;
+  --upload-bg: #1a241e;
+  --hover: #24392b;
+  --card-border: #49624f;
+  --shadow: #00000026;
+  --button-bg: #afd6b7;
+  --button-hover: #c4e7cb;
+  --on-accent: #15251a;
+  --source-border: #7ca48a;
+  --focus: #e4bf72;
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 10px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.theme-toggle:hover {
+  background: var(--selection);
+}
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  grid-area: 1 / 1;
+}
+.theme-sun {
+  display: none;
+}
+[data-theme="dark"] .theme-sun {
+  display: block;
+}
+[data-theme="dark"] .theme-moon {
+  display: none;
+}
+
+/* A quiet reading desk: accent belongs to documents, the question and citations. */
+.desk {
+  background: var(--paper);
+}
+.desk-intro {
+  position: relative;
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.eyebrow::before {
+  content: "";
+  width: 23px;
+  height: 1px;
+  background: currentColor;
+}
+.question-card {
+  box-shadow: 0 10px 36px var(--shadow);
+}
+.question-card:focus-within {
+  border-color: var(--green);
+}
+.upload-plus {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+.document {
+  border-radius: 7px;
+}
+.document:hover {
+  background: var(--hover);
+}
+.source {
+  border-radius: 0 8px 8px 0;
+  background: var(--upload-bg);
+  padding: 15px 18px;
+}
+.source summary {
+  line-height: 1.7;
+}
+.source[open] summary {
+  font-weight: 600;
+}
+.result .source-heading h3 {
+  letter-spacing: 0.04em;
+}
+.connection {
+  white-space: nowrap;
+}
+.primary:disabled {
+  opacity: 1;
+  background: var(--selection);
+  color: var(--muted);
+}
+.text-button:hover {
+  background: var(--hover);
+  border-radius: 5px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .desk-intro {
+    animation: settle-in 480ms both;
+  }
+  .question-card {
+    animation: settle-in 480ms 90ms both;
+  }
+  .empty-answer {
+    animation: settle-in 480ms 170ms both;
+  }
+  .result:not([hidden]) {
+    animation: settle-in 360ms both;
+  }
+  .source {
+    animation: settle-in 300ms both;
+  }
+  .source:nth-child(2) {
+    animation-delay: 50ms;
+  }
+  .source:nth-child(3) {
+    animation-delay: 100ms;
+  }
+  .source:nth-child(4) {
+    animation-delay: 150ms;
+  }
+  .source:nth-child(5) {
+    animation-delay: 200ms;
+  }
+  .source[open] blockquote {
+    animation: quote-in 200ms both;
+  }
+  .primary,
+  .upload,
+  .document,
+  .text-button,
+  .theme-toggle {
+    transition:
+      transform 160ms ease,
+      background-color 160ms ease,
+      border-color 160ms ease;
+  }
+  .primary span {
+    transition: transform 180ms ease;
+  }
+  .primary:hover:enabled span {
+    transform: translate(2px, -2px);
+  }
+  .primary:active:enabled,
+  .theme-toggle:active {
+    transform: scale(0.97);
+  }
+  .upload:hover {
+    transform: translateY(-2px);
+  }
+  .theme-toggle:active svg {
+    transform: rotate(20deg);
+  }
+  .connection.online::before {
+    animation: connected 650ms ease-out;
+  }
+}
+@keyframes settle-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes quote-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes connected {
+  0% {
+    box-shadow: 0 0 0 0 var(--selection);
+  }
+  100% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+
+@media (max-width: 600px) {
+  .topbar nav {
+    gap: 10px;
+  }
+  .topbar .brand {
+    gap: 8px;
+    font-size: 21px;
+  }
+  .topbar .connection {
+    max-width: none;
+    font-size: 10px;
+  }
+  .topbar .connection::before {
+    margin-right: 5px;
+  }
+  .theme-toggle {
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+  }
+}
+@media (max-width: 370px) {
+  .topbar {
+    padding: 0 12px;
+  }
+  .topbar nav {
+    gap: 8px;
+  }
+  .topbar nav > a {
+    font-size: 10px;
   }
 }
