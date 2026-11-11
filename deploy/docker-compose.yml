@@ -13,7 +13,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/001-vector.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U docmind -d docmind"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U docmind -d docmind"]
       interval: 2s
       timeout: 3s
       retries: 15
