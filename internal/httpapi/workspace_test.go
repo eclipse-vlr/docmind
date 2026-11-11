@@ -13,7 +13,7 @@ import (
 
 func TestWorkspaceAndMetricsPrivacy(t *testing.T) {
 	h := NewHandler(func(context.Context) error { return nil }, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil)), nil, nil)
-	for _, path := range []string{"/", "/app.js", "/app.css", "/theme.js", "/openapi.yaml"} {
+	for _, path := range []string{"/", "/app.js", "/app.css", "/theme.js", "/usage.js", "/openapi.yaml"} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
 		if w.Code != 200 || w.Body.Len() == 0 || w.Header().Get("X-Content-Type-Options") != "nosniff" {

@@ -169,3 +169,30 @@ func (s *Store) FailJob(ctx context.Context, job ingestion.Job, message string, 
 	}
 	return commit(ctx, tx)
 }
+
+// PauseForBudget does not consume a retry attempt. Advancing generation fences
+// the old owner even when a later claim reuses its attempt number.
+func (s *Store) PauseForBudget(ctx context.Context, job ingestion.Job) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+	if err = s.lockJob(ctx, tx, job); err != nil {
+		return err
+	}
+	message := "Достигнут дневной лимит AI. Обработка продолжится после 00:00 UTC."
+	result, err := tx.Exec(ctx, `UPDATE ingestion_jobs SET status='queued',lease_until=NULL,attempts=GREATEST(attempts-1,0),generation=generation+1,error_message=$2,
+	 next_run_at=((date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC')+interval '1 day') AT TIME ZONE 'UTC'),updated_at=clock_timestamp()
+	 WHERE id=$1 AND lease_until>clock_timestamp()`, job.ID, message)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ingestion.ErrLeaseLost
+	}
+	if _, err = tx.Exec(ctx, `UPDATE documents SET status='queued',error_message=$2,updated_at=clock_timestamp() WHERE id=$1`, job.DocumentID, message); err != nil {
+		return err
+	}
+	return commit(ctx, tx)
+}

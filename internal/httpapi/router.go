@@ -14,6 +14,19 @@ func NewHandler(ready func(context.Context) error, dbTimeout time.Duration, logg
 	metrics := newHTTPMetrics()
 	mux.Handle("GET /metrics", metrics)
 	registerWorkspace(mux)
+	if questions != nil && questions.Usage != nil {
+		mux.HandleFunc("GET /api/v1/usage", func(w http.ResponseWriter, r *http.Request) {
+			ctx, cancel := context.WithTimeout(r.Context(), dbTimeout)
+			defer cancel()
+			summary, err := questions.Usage.Summary(ctx)
+			if err != nil {
+				writeError(w, 503, "accounting_unavailable", "AI usage accounting is temporarily unavailable")
+				return
+			}
+			w.Header().Set("Cache-Control", "no-store")
+			writeJSON(w, 200, summary)
+		})
+	}
 	if service != nil {
 		registerDocuments(mux, service, dbTimeout, logger)
 	}
@@ -42,6 +55,11 @@ func NewHandler(ready func(context.Context) error, dbTimeout time.Duration, logg
 		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" {
 			w.Header().Set("Allow", "GET, HEAD")
 			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method is not allowed")
+			return
+		}
+		if questions != nil && questions.Usage != nil && r.URL.Path == "/api/v1/usage" {
+			w.Header().Set("Allow", "GET, HEAD")
+			writeError(w, 405, "method_not_allowed", "Method is not allowed")
 			return
 		}
 		if service != nil {

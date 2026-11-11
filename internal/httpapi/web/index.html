@@ -11,6 +11,7 @@
     <script src="/theme.js"></script>
     <link rel="stylesheet" href="/app.css" />
     <script src="/app.js" defer></script>
+    <script src="/usage.js" defer></script>
   </head>
   <body>
     <header class="topbar">
@@ -167,6 +168,50 @@
             </p>
           </div>
         </div>
+        <section
+          class="usage-panel"
+          id="usage-panel"
+          aria-labelledby="usage-title"
+        >
+          <div class="usage-heading">
+            <div>
+              <h3 id="usage-title">Расходы на AI</h3>
+              <span id="usage-period">Сегодня · UTC</span>
+            </div>
+            <button id="usage-refresh" class="text-button" type="button">
+              Обновить расходы
+            </button>
+          </div>
+          <div class="usage-values">
+            <div>
+              <span>Оценка расходов</span
+              ><strong id="usage-estimated">—</strong>
+            </div>
+            <div>
+              <span>Дневной лимит</span><strong id="usage-limit">—</strong>
+            </div>
+            <div>
+              <span>Зарезервировано</span><strong id="usage-reserved">—</strong>
+            </div>
+            <div>
+              <span>Доступно</span><strong id="usage-remaining">—</strong>
+            </div>
+          </div>
+          <progress
+            id="usage-progress"
+            max="100"
+            value="0"
+            aria-label="Расходы и резервы относительно дневного лимита"
+          ></progress>
+          <p class="usage-details">
+            Учтено попыток AI: <span id="usage-calls">—</span> · Токенов по
+            данным Яндекса:
+            <span id="usage-tokens">—</span>
+          </p>
+          <p class="usage-note" id="usage-note" role="status">
+            Загружаем данные потребления…
+          </p>
+        </section>
         <footer>
           <span>DocMind / рабочее пространство</span
           ><span>Текст → поиск → ответ с источниками</span>

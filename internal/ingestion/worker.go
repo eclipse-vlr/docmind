@@ -8,6 +8,7 @@ import (
 
 	"docmind/internal/documents"
 	"docmind/internal/llm"
+	"docmind/internal/usage"
 )
 
 type Settings struct {
@@ -85,6 +86,13 @@ func (w *Worker) Step(ctx context.Context) error {
 	}
 	finishCtx, cancelFinish := context.WithTimeout(ctx, w.settings.DBTimeout)
 	defer cancelFinish()
+	if errors.Is(err, usage.ErrBudget) {
+		if paused, ok := w.repo.(interface {
+			PauseForBudget(context.Context, Job) error
+		}); ok {
+			return paused.PauseForBudget(finishCtx, job)
+		}
+	}
 	if err == nil {
 		if err := w.repo.CompleteJob(finishCtx, job, chunks); err != nil {
 			return err

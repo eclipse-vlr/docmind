@@ -44,6 +44,9 @@ func run() error {
 		return err
 	}
 	defer db.Close()
+	if _, err := config.Billing(os.Getenv, db, embeddings); err != nil {
+		return err
+	}
 	checkCtx, cancel := context.WithTimeout(ctx, cfg.DBTimeout)
 	err = db.SchemaReady(checkCtx)
 	cancel()

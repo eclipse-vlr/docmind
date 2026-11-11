@@ -430,6 +430,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Недостаточно доступного бюджета для резерва. До этого мог быть оплачен embedding вопроса. Retry-After до следующего UTC-дня."
           }
         },
         "requestBody": {
@@ -471,6 +474,30 @@
           }
         },
         "operationId": "httpMetrics"
+      }
+    },
+    "/api/v1/usage": {
+      "get": {
+        "summary": "Потребление и дневной бюджет AI",
+        "operationId": "getUsage",
+        "responses": {
+          "200": {
+            "description": "Общая статистика API, worker и CLI за текущий UTC-день",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usage"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Учёт недоступен"
+          },
+          "405": {
+            "description": "Метод не поддерживается"
+          }
+        }
       }
     }
   },
@@ -657,6 +684,83 @@
             "description": "Может быть пустым. Сервер проверяет происхождение фрагментов, но не истинность ответа."
           }
         }
+      },
+      "Usage": {
+        "type": "object",
+        "required": [
+          "day_utc",
+          "limit_rub",
+          "estimated_rub",
+          "reserved_rub",
+          "remaining_rub",
+          "calls",
+          "recorded_calls",
+          "unknown_calls",
+          "pending_calls",
+          "input_tokens",
+          "output_tokens",
+          "embedding_tokens",
+          "reservation_overruns"
+        ],
+        "properties": {
+          "day_utc": {
+            "type": "string"
+          },
+          "limit_rub": {
+            "type": "string"
+          },
+          "estimated_rub": {
+            "type": "string"
+          },
+          "reserved_rub": {
+            "type": "string"
+          },
+          "remaining_rub": {
+            "type": "string"
+          },
+          "calls": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Допущенные попытки. Записываются до сетевого обращения; не являются подтверждённым числом оплаченных вызовов."
+          },
+          "recorded_calls": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "unknown_calls": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "pending_calls": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "input_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "output_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "embedding_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "reservation_overruns": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "description": "Учёт за день начала запроса UTC. Денежные строки — RUB, 9 знаков после точки. Оценка по usage и настроенным ценам, не счёт Billing. Reserved включает pending/unknown; fake-вызовы не учитываются."
       }
     }
   },

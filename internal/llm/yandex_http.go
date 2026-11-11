@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"docmind/internal/usage"
 )
 
 func newYandexClient(key, folder string, timeout time.Duration) (*http.Client, error) {
@@ -31,7 +33,7 @@ func newYandexClient(key, folder string, timeout time.Duration) (*http.Client, e
 
 // yandexRequest makes one bounded call to a fixed provider endpoint. Retry
 // ownership remains with the caller; errors never include keys or payloads.
-func yandexRequest(ctx context.Context, client *http.Client, endpoint, key, folder string, body []byte, limit int64) ([]byte, error) {
+func yandexRequest(ctx context.Context, client *http.Client, endpoint, key, folder string, body []byte, limit int64, meter *usage.Meter, kind string) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -42,6 +44,21 @@ func yandexRequest(ctx context.Context, client *http.Client, endpoint, key, fold
 	req.Header.Set("Authorization", "Api-Key "+key)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-folder-id", folder)
+	var reservation int64
+	settled := false
+	if meter != nil {
+		reservation, err = meter.Begin(ctx, kind, len(body))
+		if err != nil {
+			return nil, err
+		}
+		// A panic, network error, timeout or truncated body cannot prove zero
+		// charge. Retain the reservation unless actual usage was persisted.
+		defer func() {
+			if !settled {
+				_ = meter.Finish(reservation, kind, nil)
+			}
+		}()
+	}
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, yandexTransportError(ctx, err)
@@ -63,6 +80,12 @@ func yandexRequest(ctx context.Context, client *http.Client, endpoint, key, fold
 	}
 	if int64(len(raw)) > limit {
 		return nil, ErrResponse
+	}
+	if meter != nil {
+		if err := meter.Finish(reservation, kind, raw); err != nil {
+			return nil, err
+		}
+		settled = true
 	}
 	return raw, nil
 }
