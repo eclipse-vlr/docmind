@@ -18,6 +18,10 @@ const statuses = {
   failed: "Ошибка обработки",
 };
 const errors = {
+  budget_exceeded:
+    "Недостаточно дневного бюджета для нового запроса. Следующий день учёта начинается в 00:00 UTC.",
+  accounting_unavailable:
+    "Учёт расходов временно недоступен. Платный запрос не может продолжиться.",
   invalid_question: "Проверьте вопрос и выбранные документы.",
   documents_not_ready: "Дождитесь обработки всех выбранных документов.",
   embedding_model_mismatch: "Нужна переиндексация документов.",
@@ -93,7 +97,7 @@ function renderDocuments() {
     const input = row.querySelector("input");
     row.querySelector("strong").textContent = doc.original_name;
     row.querySelector("small").textContent =
-      `${statuses[doc.status] || doc.status} · ${Math.max(1, Math.round(doc.size_bytes / 1024))} КБ`;
+      `${doc.status === "queued" && doc.error_message?.startsWith("Достигнут дневной лимит AI.") ? "Ожидание бюджета" : statuses[doc.status] || doc.status} · ${Math.max(1, Math.round(doc.size_bytes / 1024))} КБ`;
     row.querySelector(".file-icon").textContent =
       doc.mime_type === "application/pdf" ? "PDF" : "TXT";
     input.checked = state.selected.has(doc.id);

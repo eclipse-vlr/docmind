@@ -11,7 +11,7 @@ import (
 var workspace embed.FS
 
 func registerWorkspace(mux *http.ServeMux) {
-	for route, file := range map[string]string{"GET /{$}": "index.html", "GET /app.css": "app.css", "GET /app.js": "app.js", "GET /theme.js": "theme.js"} {
+	for route, file := range map[string]string{"GET /{$}": "index.html", "GET /app.css": "app.css", "GET /app.js": "app.js", "GET /theme.js": "theme.js", "GET /usage.js": "usage.js"} {
 		mux.HandleFunc(route, func(w http.ResponseWriter, r *http.Request) {
 			body, err := workspace.ReadFile("web/" + file)
 			if err != nil {
@@ -26,7 +26,7 @@ func registerWorkspace(mux *http.ServeMux) {
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			case "app.css":
 				w.Header().Set("Content-Type", "text/css; charset=utf-8")
-			case "app.js", "theme.js":
+			case "app.js", "theme.js", "usage.js":
 				w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 			}
 			_, _ = w.Write(body)

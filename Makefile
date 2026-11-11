@@ -10,7 +10,7 @@ test:
 	go test ./...
 
 test-ui:
-	node --test tests/frontend/workspace.test.js
+	node --test tests/frontend/workspace.test.js tests/frontend/usage.test.js
 
 test-docker:
 	docker build --target test -t docmind-test .

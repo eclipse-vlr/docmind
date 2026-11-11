@@ -10,7 +10,7 @@ COPY . .
 FROM source AS test
 RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils util-linux nodejs \
     && rm -rf /var/lib/apt/lists/*
-RUN node --test tests/frontend/workspace.test.js \
+RUN node --test tests/frontend/workspace.test.js tests/frontend/usage.test.js \
     && go vet ./... && go test -race -count=1 ./...
 
 FROM source AS build
