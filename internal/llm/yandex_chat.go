@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"docmind/internal/usage"
 )
 
 const YandexChatModel = "aliceai-llm"
@@ -24,7 +26,10 @@ type YandexChat struct {
 	folder   string
 	client   *http.Client
 	endpoint string
+	meter    *usage.Meter
 }
+
+func (p *YandexChat) SetUsageMeter(meter *usage.Meter) { p.meter = meter }
 
 func NewYandexChat(key, folder string, timeout time.Duration) (*YandexChat, error) {
 	client, err := newYandexClient(key, folder, timeout)
@@ -66,7 +71,7 @@ func (p *YandexChat) Chat(ctx context.Context, in ChatRequest) (ChatResult, erro
 	if err != nil {
 		return ChatResult{}, ErrInput
 	}
-	raw, err := yandexRequest(ctx, p.client, p.endpoint, p.key, p.folder, body, maxChatResponseBytes)
+	raw, err := yandexRequest(ctx, p.client, p.endpoint, p.key, p.folder, body, maxChatResponseBytes, p.meter, "chat")
 	if err != nil {
 		return ChatResult{}, err
 	}

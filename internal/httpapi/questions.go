@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"mime"
@@ -18,6 +19,7 @@ import (
 	"docmind/internal/documents"
 	"docmind/internal/llm"
 	"docmind/internal/rag"
+	"docmind/internal/usage"
 )
 
 const maxQuestionBody = 16 << 10
@@ -31,6 +33,9 @@ type QuestionService interface {
 type QuestionOptions struct {
 	Service QuestionService
 	Timeout time.Duration
+	Usage   interface {
+		Summary(context.Context) (usage.Summary, error)
+	}
 }
 
 type questionHandlers struct {
@@ -156,6 +161,11 @@ func readQuestionBody(ctx context.Context, w http.ResponseWriter, r *http.Reques
 func (h *questionHandlers) fail(w http.ResponseWriter, r *http.Request, err error) {
 	status, code, message := http.StatusInternalServerError, "internal_error", "Question processing failed"
 	switch {
+	case errors.Is(err, usage.ErrBudget):
+		status, code, message = 429, "budget_exceeded", "Daily AI budget is exhausted; wait for the next UTC day"
+		w.Header().Set("Retry-After", fmt.Sprint(max(1, int(time.Until(time.Now().UTC().Truncate(24*time.Hour).Add(24*time.Hour)).Seconds()))))
+	case errors.Is(err, usage.ErrUnavailable):
+		status, code, message = 503, "accounting_unavailable", "AI usage accounting is temporarily unavailable"
 	case errors.Is(err, rag.ErrInvalid):
 		status, code, message = 400, "invalid_question", "Provide a nonempty question and 1-20 unique document UUIDs"
 	case errors.Is(err, documents.ErrNotFound):

@@ -53,6 +53,10 @@ func run() error {
 		return fmt.Errorf("open database: %w", err)
 	}
 	defer db.Close()
+	meter, err := config.Billing(os.Getenv, db, embeddings, chat)
+	if err != nil {
+		return err
+	}
 	checkCtx, cancelCheck := context.WithTimeout(ctx, cfg.DBTimeout)
 	err = db.SchemaReady(checkCtx)
 	cancelCheck()
@@ -89,7 +93,7 @@ func run() error {
 	defer func() { cancelCleanup(); <-cleanupDone }()
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.NewHandler(db.SchemaReady, cfg.DBTimeout, logger, service, &httpapi.QuestionOptions{Service: questions, Timeout: questionTimeout}),
+		Handler:           httpapi.NewHandler(db.SchemaReady, cfg.DBTimeout, logger, service, &httpapi.QuestionOptions{Service: questions, Timeout: questionTimeout, Usage: meter}),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,
 		WriteTimeout:      cfg.WriteTimeout,

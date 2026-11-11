@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"docmind/internal/usage"
 )
 
 // Both encoders produce vectors in the same space; their input roles differ.
@@ -26,7 +28,10 @@ type YandexEmbeddings struct {
 	modelURI string
 	client   *http.Client
 	endpoint string
+	meter    *usage.Meter
 }
+
+func (p *YandexEmbeddings) SetUsageMeter(meter *usage.Meter) { p.meter = meter }
 
 func NewYandexEmbeddings(key, folder string, purpose EmbeddingPurpose, timeout time.Duration) (*YandexEmbeddings, error) {
 	if purpose != DocumentEmbedding && purpose != QueryEmbedding {
@@ -63,7 +68,11 @@ func (p *YandexEmbeddings) Embed(ctx context.Context, texts []string) ([][]float
 		if err != nil {
 			return nil, ErrInput
 		}
-		raw, err := yandexRequest(ctx, p.client, p.endpoint, p.key, p.folder, body, maxEmbeddingResponseBytes)
+		kind := "embedding_query"
+		if strings.Contains(p.modelURI, "-doc/") {
+			kind = "embedding_doc"
+		}
+		raw, err := yandexRequest(ctx, p.client, p.endpoint, p.key, p.folder, body, maxEmbeddingResponseBytes, p.meter, kind)
 		if err != nil {
 			return nil, err
 		}

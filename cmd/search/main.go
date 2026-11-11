@@ -43,6 +43,9 @@ func run() error {
 		return errors.New("search database unavailable")
 	}
 	defer db.Close()
+	if _, err := config.Billing(os.Getenv, db, provider); err != nil {
+		return err
+	}
 	if err := db.SchemaReady(ctx); err != nil {
 		return errors.New("search schema not ready; run migrations")
 	}
