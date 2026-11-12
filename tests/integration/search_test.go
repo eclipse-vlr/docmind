@@ -16,7 +16,7 @@ func TestSearchRanksCorpusAndFiltersDocuments(t *testing.T) {
 	ctx := context.Background()
 	a := queuedDocument(t, f, "PostgreSQL transactions database")
 	b := queuedDocument(t, f, "cats dogs animals")
-	c := queuedDocument(t, f, "PostgreSQL transactions database")
+	c := queuedDocument(t, f, "PostgreSQL transactions database excluded")
 	for range 3 {
 		if err := worker(t, f, ingestion.TextParser{}).Step(ctx); err != nil {
 			t.Fatal(err)

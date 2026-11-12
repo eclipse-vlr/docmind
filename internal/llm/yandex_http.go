@@ -3,6 +3,7 @@ package llm
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -46,17 +47,26 @@ func yandexRequest(ctx context.Context, client *http.Client, endpoint, key, fold
 	req.Header.Set("x-folder-id", folder)
 	var reservation int64
 	settled := false
+	started := time.Now()
+	requestID := ""
+	status := 0
+	var metadata struct {
+		Model string `json:"model"`
+	}
+	_ = json.Unmarshal(body, &metadata)
 	if meter != nil {
 		reservation, err = meter.Begin(ctx, kind, len(body))
 		if err != nil {
 			return nil, err
 		}
+		meter.Observe(reservation, metadata.Model, "", 0, 0)
 		// A panic, network error, timeout or truncated body cannot prove zero
 		// charge. Retain the reservation unless actual usage was persisted.
 		defer func() {
 			if !settled {
 				_ = meter.Finish(reservation, kind, nil)
 			}
+			meter.Observe(reservation, metadata.Model, requestID, time.Since(started), status)
 		}()
 	}
 	res, err := client.Do(req)
@@ -64,6 +74,11 @@ func yandexRequest(ctx context.Context, client *http.Client, endpoint, key, fold
 		return nil, yandexTransportError(ctx, err)
 	}
 	defer res.Body.Close()
+	status = res.StatusCode
+	requestID = res.Header.Get("x-request-id")
+	if requestID == "" {
+		requestID = res.Header.Get("x-server-trace-id")
+	}
 	if res.StatusCode != http.StatusOK {
 		switch {
 		case res.StatusCode == 408 || res.StatusCode == 504:

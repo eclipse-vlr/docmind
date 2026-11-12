@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"strings"
@@ -78,8 +79,8 @@ func TestIngestionLifecycle(t *testing.T) {
 
 func TestConcurrentIngestionClaims(t *testing.T) {
 	f := setup(t)
-	for range 12 {
-		queuedDocument(t, f, "text")
+	for i := range 12 {
+		queuedDocument(t, f, fmt.Sprintf("text %d", i))
 	}
 	type result struct {
 		j   ingestion.Job

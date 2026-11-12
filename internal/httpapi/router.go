@@ -12,7 +12,23 @@ import (
 func NewHandler(ready func(context.Context) error, dbTimeout time.Duration, logger *slog.Logger, service DocumentService, questions *QuestionOptions) http.Handler {
 	mux := http.NewServeMux()
 	metrics := newHTTPMetrics()
-	mux.Handle("GET /metrics", metrics)
+	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
+		if stats, ok := service.(interface {
+			AIStats(context.Context) (string, error)
+		}); ok {
+			ctx, cancel := context.WithTimeout(r.Context(), dbTimeout)
+			defer cancel()
+			data, err := stats.AIStats(ctx)
+			if err != nil {
+				writeError(w, 503, "metrics_unavailable", "Metrics unavailable")
+				return
+			}
+			metrics.ServeHTTP(w, r)
+			_, _ = w.Write([]byte(data))
+			return
+		}
+		metrics.ServeHTTP(w, r)
+	})
 	registerWorkspace(mux)
 	if questions != nil && questions.Usage != nil {
 		mux.HandleFunc("GET /api/v1/usage", func(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +94,9 @@ func NewHandler(ready func(context.Context) error, dbTimeout time.Duration, logg
 		}
 		writeError(w, http.StatusNotFound, "not_found", "Endpoint not found")
 	})
-	return observe(metrics.wrap(mux), logger)
+	// Headerless CLI clients are allowed by the standard policy. Browser
+	// cross-site mutations are rejected before handlers read or persist data.
+	return observe(http.NewCrossOriginProtection().Handler(metrics.wrap(mux)), logger)
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {

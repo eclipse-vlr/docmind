@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -59,7 +60,7 @@ func (s *Store) ClaimJob(ctx context.Context, lease time.Duration, maxAttempts i
 	}
 	err = tx.QueryRow(ctx, `UPDATE ingestion_jobs SET status='processing', attempts=attempts+1,
 		lease_until=clock_timestamp()+$2*interval '1 microsecond', error_message='', updated_at=clock_timestamp()
-		WHERE id=$1 RETURNING attempts,generation`, job.ID, lease.Microseconds()).Scan(&job.Attempt, &job.Generation)
+		WHERE id=$1 RETURNING attempts,generation,index_generation`, job.ID, lease.Microseconds()).Scan(&job.Attempt, &job.Generation, &job.IndexGeneration)
 	if err != nil {
 		return job, err
 	}
@@ -70,6 +71,57 @@ func (s *Store) ClaimJob(ctx context.Context, lease time.Duration, maxAttempts i
 		return job, err
 	}
 	return job, nil
+}
+
+// A read checks the same fence as a write, including cache misses.
+func (s *Store) LoadEmbedding(ctx context.Context, job ingestion.Job, hash string) ([]float32, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollback(tx)
+	if err = s.lockJob(ctx, tx, job); err != nil {
+		return nil, err
+	}
+	var raw []byte
+	err = tx.QueryRow(ctx, `SELECT embedding FROM embedding_checkpoints WHERE job_id=$1 AND index_generation=$2 AND model=$3 AND text_hash=$4`, job.ID, job.IndexGeneration, job.Model, hash).Scan(&raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, commit(ctx, tx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	var vector []float32
+	if err = json.Unmarshal(raw, &vector); err != nil {
+		return nil, err
+	}
+	if err = llm.ValidateVector(vector); err != nil {
+		return nil, err
+	}
+	return vector, commit(ctx, tx)
+}
+
+func (s *Store) SaveEmbedding(ctx context.Context, job ingestion.Job, hash string, vector []float32) error {
+	if err := llm.ValidateVector(vector); err != nil {
+		return err
+	}
+	raw, err := json.Marshal(vector)
+	if err != nil {
+		return err
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+	if err = s.lockJob(ctx, tx, job); err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO embedding_checkpoints(job_id,index_generation,model,text_hash,embedding) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`, job.ID, job.IndexGeneration, job.Model, hash, raw)
+	if err != nil {
+		return err
+	}
+	return commit(ctx, tx)
 }
 
 func (s *Store) lockJob(ctx context.Context, tx pgx.Tx, job ingestion.Job) error {
@@ -192,6 +244,26 @@ func (s *Store) PauseForBudget(ctx context.Context, job ingestion.Job) error {
 		return ingestion.ErrLeaseLost
 	}
 	if _, err = tx.Exec(ctx, `UPDATE documents SET status='queued',error_message=$2,updated_at=clock_timestamp() WHERE id=$1`, job.DocumentID, message); err != nil {
+		return err
+	}
+	return commit(ctx, tx)
+}
+
+// Yield only after durable progress. A slow large document can span windows
+// without exhausting failure retries; generation still fences its old owner.
+func (s *Store) PauseForProgress(ctx context.Context, job ingestion.Job) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+	if err = s.lockJob(ctx, tx, job); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE ingestion_jobs SET status='queued',attempts=GREATEST(attempts-1,0),generation=generation+1,lease_until=NULL,next_run_at=clock_timestamp(),updated_at=clock_timestamp() WHERE id=$1`, job.ID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE documents SET status='queued',updated_at=clock_timestamp() WHERE id=$1`, job.DocumentID); err != nil {
 		return err
 	}
 	return commit(ctx, tx)

@@ -24,5 +24,12 @@ func Embeddings(getenv func(string) string, purpose llm.EmbeddingPurpose) (llm.E
 			return nil, errors.New("EMBEDDING_HTTP_TIMEOUT must be a positive duration up to 1m")
 		}
 	}
-	return llm.NewYandexEmbeddings(getenv("YANDEX_API_KEY"), getenv("YANDEX_FOLDER_ID"), purpose, timeout)
+	p, err := llm.NewYandexEmbeddings(getenv("YANDEX_API_KEY"), getenv("YANDEX_FOLDER_ID"), purpose, timeout)
+	if err != nil {
+		return nil, err
+	}
+	if err = p.ConfigureRevision(getenv("EMBEDDING_REVISION"), getenv("EMBEDDING_SPACE_EPOCH")); err != nil {
+		return nil, err
+	}
+	return p, nil
 }

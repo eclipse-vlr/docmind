@@ -34,7 +34,7 @@ func TestEmbeddingMigrationUpgradesTextOnlyDocuments(t *testing.T) {
 	}
 	var ids []string
 	for _, state := range []string{"ready", "processing", "queued", "failed"} {
-		d := queuedDocument(t, f, "source text")
+		d := legacyDocument(t, f, "source text")
 		ids = append(ids, d.ID)
 		jobState := state
 		if state == "ready" {
@@ -112,7 +112,7 @@ func TestYandexEmbeddingMigrationPreservesSourcesAndFencesOldWorkers(t *testing.
 	var ids []string
 	var stale ingestion.Job
 	for _, state := range []string{"ready", "processing", "queued", "failed"} {
-		d := queuedDocument(t, f, "source text")
+		d := legacyDocument(t, f, "source text")
 		ids = append(ids, d.ID)
 		jobState := state
 		if state == "ready" {
@@ -189,4 +189,18 @@ func TestYandexEmbeddingMigrationPreservesSourcesAndFencesOldWorkers(t *testing.
 	if err := f.pool.QueryRow(ctx, "SELECT count(*) FROM document_chunks WHERE embedding IS NOT NULL AND public.vector_dims(embedding)=256 AND content='source text'").Scan(&count); err != nil || count != 3 {
 		t.Fatal("new vectors invalid", count, err)
 	}
+}
+
+func legacyDocument(t *testing.T, f *fixture, text string) documents.Document {
+	t.Helper()
+	id := documents.NewID()
+	ctx := context.Background()
+	if err := f.files.Save(ctx, id, []byte(text)); err != nil {
+		t.Fatal(err)
+	}
+	d, err := f.repo.Create(ctx, documents.Document{ID: id, OriginalName: "legacy.txt", MIMEType: "text/plain", SizeBytes: int64(len(text)), StorageKey: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
 }
