@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"testing"
+	"time"
 
 	"docmind/internal/llm"
 )
@@ -17,14 +17,14 @@ func (f embeddingFunc) Embed(ctx context.Context, texts []string) ([][]float32, 
 	return f(ctx, texts)
 }
 
-func TestWorkerEmbeddingBatchesPreserveChunks(t *testing.T) {
+func TestWorkerEmbeddingCheckpointsPreserveChunkOrder(t *testing.T) {
 	chunks := make([]Chunk, llm.BatchSize*2+1)
 	for i := range chunks {
 		chunks[i].Text = fmt.Sprintf("chunk-%d", i)
 	}
 	var sizes []int
 	seen := 0
-	w := Worker{embeddings: embeddingFunc(func(_ context.Context, texts []string) ([][]float32, error) {
+	w := Worker{repo: checkpointStub{}, settings: Settings{DBTimeout: time.Second}, embeddings: embeddingFunc(func(_ context.Context, texts []string) ([][]float32, error) {
 		sizes = append(sizes, len(texts))
 		vectors := make([][]float32, len(texts))
 		for i, text := range texts {
@@ -37,11 +37,16 @@ func TestWorkerEmbeddingBatchesPreserveChunks(t *testing.T) {
 		}
 		return vectors, nil
 	})}
-	if err := w.embed(context.Background(), chunks); err != nil {
+	if err := w.embedResumable(context.Background(), Job{Model: "test-model"}, chunks); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sizes, []int{32, 32, 1}) {
+	if len(sizes) != len(chunks) {
 		t.Fatal(sizes)
+	}
+	for _, size := range sizes {
+		if size != 1 {
+			t.Fatal("success not independently checkpointed", sizes)
+		}
 	}
 	for i, c := range chunks {
 		if c.Embedding[0] != float32(i+1) {
@@ -53,13 +58,25 @@ func TestWorkerEmbeddingBatchesPreserveChunks(t *testing.T) {
 func TestWorkerEmbeddingStopsOnProviderError(t *testing.T) {
 	for _, problem := range []error{llm.ErrUnavailable, llm.ErrRejected, context.Canceled} {
 		calls := 0
-		w := Worker{embeddings: embeddingFunc(func(context.Context, []string) ([][]float32, error) { calls++; return nil, problem })}
-		if err := w.embed(context.Background(), make([]Chunk, llm.BatchSize+1)); !errors.Is(err, problem) || calls != 1 {
+		w := Worker{repo: checkpointStub{}, settings: Settings{DBTimeout: time.Second}, embeddings: embeddingFunc(func(context.Context, []string) ([][]float32, error) { calls++; return nil, problem })}
+		if err := w.embedResumable(context.Background(), Job{Model: "test-model"}, make([]Chunk, llm.BatchSize+1)); !errors.Is(err, problem) || calls != 1 {
 			t.Fatal("worker continued after failure", err, calls)
 		}
 	}
-	w := Worker{embeddings: embeddingFunc(func(context.Context, []string) ([][]float32, error) { return nil, nil })}
-	if err := w.embed(context.Background(), []Chunk{{Text: "text"}}); !errors.Is(err, llm.ErrResponse) {
+	w := Worker{repo: checkpointStub{}, settings: Settings{DBTimeout: time.Second}, embeddings: embeddingFunc(func(context.Context, []string) ([][]float32, error) { return nil, nil })}
+	if err := w.embedResumable(context.Background(), Job{Model: "test-model"}, []Chunk{{Text: "text"}}); !errors.Is(err, llm.ErrResponse) {
 		t.Fatal(err)
 	}
 }
+
+// Persistence and fencing are exercised with PostgreSQL in integration tests.
+type checkpointStub struct{}
+
+func (checkpointStub) ClaimJob(context.Context, time.Duration, int) (Job, error) {
+	return Job{}, ErrNoJob
+}
+func (checkpointStub) CompleteJob(context.Context, Job, []Chunk) error               { return nil }
+func (checkpointStub) FailJob(context.Context, Job, string, bool, int) error         { return nil }
+func (checkpointStub) LoadEmbedding(context.Context, Job, string) ([]float32, error) { return nil, nil }
+func (checkpointStub) SaveEmbedding(context.Context, Job, string, []float32) error   { return nil }
+func (checkpointStub) PauseForProgress(context.Context, Job) error                   { return nil }

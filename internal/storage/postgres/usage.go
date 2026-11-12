@@ -3,10 +3,44 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
+	"time"
 
 	"docmind/internal/usage"
 	"github.com/jackc/pgx/v5"
 )
+
+func (s *Store) ObserveUsage(ctx context.Context, id int64, model, requestID string, duration time.Duration, status int) error {
+	if len(model) > 256 || len(requestID) > 200 || status < 0 || status > 599 {
+		return usage.ErrUnavailable
+	}
+	_, err := s.pool.Exec(ctx, `UPDATE ai_usage_calls SET model=$2,request_id=$3,duration_ms=$4,http_status=$5,prompt_version=CASE WHEN kind='chat' THEN 'rag-v1' ELSE 'chunk-v1' END WHERE id=$1`, id, model, requestID, max(duration.Milliseconds(), 0), status)
+	return err
+}
+
+func (s *Store) AIStats(ctx context.Context) (string, error) {
+	var pending, unknown, recorded, errorsCount, latency, retries, checkpoints, queued, oldest int64
+	err := s.pool.QueryRow(ctx, `SELECT count(*) FILTER(WHERE status='pending'),count(*) FILTER(WHERE status='unknown'),count(*) FILTER(WHERE status='recorded'),count(*) FILTER(WHERE http_status<>200 AND http_status<>0),COALESCE(sum(duration_ms),0) FROM ai_usage_calls`).Scan(&pending, &unknown, &recorded, &errorsCount, &latency)
+	if err != nil {
+		return "", err
+	}
+	err = s.pool.QueryRow(ctx, `SELECT COALESCE(sum(GREATEST(attempts-1,0)),0),count(*) FILTER(WHERE status='queued'),COALESCE(max(EXTRACT(epoch FROM clock_timestamp()-created_at)) FILTER(WHERE status='queued'),0)::bigint FROM ingestion_jobs`).Scan(&retries, &queued, &oldest)
+	if err != nil {
+		return "", err
+	}
+	if err = s.pool.QueryRow(ctx, `SELECT count(*) FROM embedding_checkpoints`).Scan(&checkpoints); err != nil {
+		return "", err
+	}
+	var out strings.Builder
+	for _, v := range []struct {
+		name  string
+		value int64
+	}{{"calls_pending", pending}, {"calls_unknown", unknown}, {"calls_recorded", recorded}, {"provider_errors", errorsCount}, {"provider_duration_milliseconds_sum", latency}, {"ingestion_retries", retries}, {"embedding_checkpoints", checkpoints}, {"ingestion_queued", queued}, {"ingestion_oldest_seconds", oldest}} {
+		fmt.Fprintf(&out, "docmind_ai_%s %d\n", v.name, v.value)
+	}
+	return out.String(), nil
+}
 
 // ensureUsageDay serializes admissions across API, worker and CLI. Lowering a
 // limit takes effect immediately; raising it takes effect on the next UTC day.

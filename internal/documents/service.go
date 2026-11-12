@@ -2,6 +2,7 @@ package documents
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"time"
@@ -28,6 +29,15 @@ type Service struct {
 
 func NewService(repo Repository, files Storage) *Service { return &Service{repo: repo, files: files} }
 
+func (s *Service) AIStats(ctx context.Context) (string, error) {
+	if stats, ok := s.repo.(interface {
+		AIStats(context.Context) (string, error)
+	}); ok {
+		return stats.AIStats(ctx)
+	}
+	return "", nil
+}
+
 func (s *Service) Upload(ctx context.Context, filename string, body []byte) (Document, error) {
 	name, mime, err := ValidateUpload(filename, body)
 	if err != nil {
@@ -38,8 +48,23 @@ func (s *Service) Upload(ctx context.Context, filename string, body []byte) (Doc
 	if err := s.files.Save(ctx, id, body); err != nil {
 		return Document{}, fmt.Errorf("save document: %w", err)
 	}
-	created, err := s.repo.Create(ctx, d)
+	var created Document
+	if dedup, ok := s.repo.(interface {
+		CreateUnique(context.Context, Document, string) (Document, error)
+	}); ok {
+		hash := fmt.Sprintf("%x", sha256.Sum256(append([]byte(mime+"\x00"), body...)))
+		created, err = dedup.CreateUnique(ctx, d, hash)
+	} else {
+		created, err = s.repo.Create(ctx, d)
+	}
 	if err == nil {
+		if created.ID != id {
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer cancel()
+			if err := s.clean(cleanupCtx, id); err != nil {
+				return Document{}, err
+			}
+		}
 		return created, nil
 	}
 	if errors.Is(err, ErrCommitUnknown) {

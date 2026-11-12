@@ -31,8 +31,11 @@ func (s *Store) RequeueDocument(ctx context.Context, id string) error {
 	if status == "queued" {
 		return nil
 	}
-	if _, err := tx.Exec(ctx, `UPDATE ingestion_jobs SET status='queued',attempts=0,generation=generation+1,
+	if _, err := tx.Exec(ctx, `UPDATE ingestion_jobs SET status='queued',attempts=0,generation=generation+1,index_generation=index_generation+1,
 		lease_until=NULL,next_run_at=clock_timestamp(),error_message='',updated_at=clock_timestamp() WHERE document_id=$1`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM embedding_checkpoints WHERE job_id IN (SELECT id FROM ingestion_jobs WHERE document_id=$1)`, id); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, "UPDATE documents SET status='queued',embedding_model='',error_message='',updated_at=clock_timestamp() WHERE id=$1", id); err != nil {

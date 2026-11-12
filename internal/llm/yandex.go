@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -29,6 +30,7 @@ type YandexEmbeddings struct {
 	client   *http.Client
 	endpoint string
 	meter    *usage.Meter
+	space    string
 }
 
 func (p *YandexEmbeddings) SetUsageMeter(meter *usage.Meter) { p.meter = meter }
@@ -46,7 +48,30 @@ func NewYandexEmbeddings(key, folder string, purpose EmbeddingPurpose, timeout t
 	return &YandexEmbeddings{key: key, folder: folder, modelURI: "emb://" + folder + "/text-embeddings-v2-" + string(purpose) + "/latest", client: client, endpoint: "https://ai.api.cloud.yandex.net/v1/embeddings"}, nil
 }
 
-func (*YandexEmbeddings) Model() string { return yandexEmbeddingSpace }
+func (p *YandexEmbeddings) Model() string {
+	if p.space != "" {
+		return p.space
+	}
+	return yandexEmbeddingSpace
+}
+
+// ConfigureRevision is a startup-only setting shared by document/query encoders.
+// Epoch deliberately invalidates cached vectors when an unpinned alias changes.
+func (p *YandexEmbeddings) ConfigureRevision(revision, epoch string) error {
+	if revision == "" {
+		revision = "latest"
+	}
+	valid := regexp.MustCompile(`^[a-zA-Z0-9._-]{1,32}$`)
+	if !valid.MatchString(revision) || (epoch != "" && !valid.MatchString(epoch)) {
+		return errors.New("invalid embedding revision or epoch")
+	}
+	i := strings.LastIndex(p.modelURI, "/")
+	p.modelURI = p.modelURI[:i+1] + revision
+	if revision != "latest" || epoch != "" {
+		p.space = yandexEmbeddingSpace + ":" + revision + ":" + epoch
+	}
+	return nil
+}
 
 func (p *YandexEmbeddings) Embed(ctx context.Context, texts []string) ([][]float32, error) {
 	if err := validateInput(texts); err != nil {

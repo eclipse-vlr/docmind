@@ -56,6 +56,20 @@ type Meter struct {
 	rates Rates
 }
 
+// Observe stores only bounded technical metadata; accounting is independent.
+func (m *Meter) Observe(id int64, model, requestID string, elapsed time.Duration, status int) {
+	if m == nil {
+		return
+	}
+	if store, ok := m.store.(interface {
+		ObserveUsage(context.Context, int64, string, string, time.Duration, int) error
+	}); ok {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_ = store.ObserveUsage(ctx, id, model, requestID, elapsed, status)
+	}
+}
+
 func New(store Store, limit int64, rates Rates) (*Meter, error) {
 	if store == nil || limit <= 0 || limit > 1_000_000*NanoRub {
 		return nil, errors.New("invalid AI budget")

@@ -2,7 +2,9 @@ package ingestion
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -76,16 +78,19 @@ func (w *Worker) Step(ctx context.Context) error {
 	if err == nil {
 		chunks, err = w.parser.Parse(jobCtx, job.MIMEType, data)
 	}
-	if err == nil {
-		err = w.embed(jobCtx, chunks)
-	}
 	job.Model = w.embeddings.Model()
+	if err == nil {
+		err = w.embedResumable(jobCtx, job, chunks)
+	}
 	cancelJob()
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	finishCtx, cancelFinish := context.WithTimeout(ctx, w.settings.DBTimeout)
 	defer cancelFinish()
+	if errors.Is(err, ErrProgress) {
+		return w.repo.PauseForProgress(finishCtx, job)
+	}
 	if errors.Is(err, usage.ErrBudget) {
 		if paused, ok := w.repo.(interface {
 			PauseForBudget(context.Context, Job) error
@@ -119,26 +124,52 @@ func (w *Worker) Step(ctx context.Context) error {
 	return nil
 }
 
-func (w *Worker) embed(ctx context.Context, chunks []Chunk) error {
-	for start := 0; start < len(chunks); start += llm.BatchSize {
-		end := min(start+llm.BatchSize, len(chunks))
-		texts := make([]string, end-start)
-		for i := range texts {
-			texts[i] = chunks[start+i].Text
+// Each provider success is persisted before the next paid request. Checkpoint
+// access also verifies ownership, so deletion or a newer claim stops this loop.
+func (w *Worker) embedResumable(ctx context.Context, job Job, chunks []Chunk) (result error) {
+	saved := 0
+	defer func() {
+		if saved > 0 && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			result = ErrProgress
 		}
-		vectors, err := w.embeddings.Embed(ctx, texts)
+	}()
+	for i := range chunks {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		hash := fmt.Sprintf("%x", sha256.Sum256([]byte("chunk-v1\x00"+chunks[i].Text)))
+		dbCtx, cancel := context.WithTimeout(ctx, w.settings.DBTimeout)
+		vector, err := w.repo.LoadEmbedding(dbCtx, job, hash)
+		cancel()
 		if err != nil {
 			return err
 		}
-		if len(vectors) != len(texts) {
-			return llm.ErrResponse
-		}
-		for i, vector := range vectors {
+		if vector == nil {
+			vectors, err := w.embeddings.Embed(ctx, []string{chunks[i].Text})
+			if err != nil {
+				return err
+			}
+			if len(vectors) != 1 {
+				return llm.ErrResponse
+			}
+			vector = vectors[0]
 			if err := llm.ValidateVector(vector); err != nil {
 				return err
 			}
-			chunks[start+i].Embedding = vector
+			// Keep a successful result even if the job deadline expires just
+			// after HTTP returns; the DB fence still rejects a stale owner.
+			dbCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), w.settings.DBTimeout)
+			err = w.repo.SaveEmbedding(dbCtx, job, hash, vector)
+			cancel()
+			if err != nil {
+				return err
+			}
+			saved++
 		}
+		if err := llm.ValidateVector(vector); err != nil {
+			return err
+		}
+		chunks[i].Embedding = vector
 	}
 	return ctx.Err()
 }

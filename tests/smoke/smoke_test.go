@@ -119,7 +119,7 @@ func TestRunningService(t *testing.T) {
 		}
 	}
 	metrics := call("GET", "/metrics", "", nil, 200)
-	if !bytes.Contains(metrics, []byte("docmind_http_requests_total")) || bytes.Contains(metrics, []byte(document.ID)) {
+	if !bytes.Contains(metrics, []byte("docmind_http_requests_total")) || !bytes.Contains(metrics, []byte("docmind_ai_embedding_checkpoints")) || bytes.Contains(metrics, []byte(document.ID)) {
 		t.Fatal("invalid metrics")
 	}
 	call("DELETE", "/api/v1/documents/"+document.ID, "", nil, 204)

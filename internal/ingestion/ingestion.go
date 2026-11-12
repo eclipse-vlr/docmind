@@ -12,6 +12,7 @@ var (
 	ErrInvalid   = errors.New("invalid or unreadable document")
 	ErrEmpty     = errors.New("document has no text layer")
 	ErrLimit     = errors.New("document extraction limit exceeded")
+	ErrProgress  = errors.New("job deadline reached after saving progress")
 )
 
 const (
@@ -22,13 +23,14 @@ const (
 )
 
 type Job struct {
-	ID         string
-	DocumentID string
-	StorageKey string
-	MIMEType   string
-	Attempt    int
-	Generation int64
-	Model      string
+	ID              string
+	DocumentID      string
+	StorageKey      string
+	MIMEType        string
+	Attempt         int
+	Generation      int64
+	Model           string
+	IndexGeneration int64
 }
 
 type Chunk struct {
@@ -42,6 +44,9 @@ type Repository interface {
 	ClaimJob(context.Context, time.Duration, int) (Job, error)
 	CompleteJob(context.Context, Job, []Chunk) error
 	FailJob(context.Context, Job, string, bool, int) error
+	LoadEmbedding(context.Context, Job, string) ([]float32, error)
+	SaveEmbedding(context.Context, Job, string, []float32) error
+	PauseForProgress(context.Context, Job) error
 }
 
 type Files interface {
